@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Lab - Gestión de Muestras</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        border: "hsl(214.3 31.8% 91.4%)",
+                        input: "hsl(214.3 31.8% 91.4%)",
+                        ring: "hsl(222.2 84% 4.9%)",
+                        background: "hsl(0 0% 100%)",
+                        foreground: "hsl(222.2 84% 4.9%)",
+                        primary: {
+                            DEFAULT: "hsl(222.2 47.4% 11.2%)",
+                            foreground: "hsl(210 40% 98%)",
+                        },
+                        secondary: {
+                            DEFAULT: "hsl(210 40% 96.1%)",
+                            foreground: "hsl(222.2 47.4% 11.2%)",
+                        },
+                        destructive: {
+                            DEFAULT: "hsl(0 84.2% 60.2%)",
+                            foreground: "hsl(210 40% 98%)",
+                        },
+                        muted: {
+                            DEFAULT: "hsl(210 40% 96.1%)",
+                            foreground: "hsl(215.4 16.3% 46.9%)",
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .drag-over {
+            border-color: hsl(222.2 47.4% 11.2%);
+            background-color: hsl(210 40% 98%);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .sidebar-active {
+            background-color: hsl(210 40% 96.1%);
+            border-left: 3px solid hsl(222.2 47.4% 11.2%);
+        }
+    </style>
+</head>
+<body class="bg-background antialiased">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-card border-r border-border flex flex-col">
+            <!-- Logo/Header -->
+            <div class="p-6 border-b border-border">
+                <!-- <h2 class="text-xl font-bold text-foreground">🔬 Lab Dashboard</h2> -->
+                 <a href="" class="group transition block duration-500 ease-in-out hover:scale-125 group-hover:drop-shadow-[0px_0px_6px_#fff]"><img src="cavedish.webp" alt=""></a>
+                <p class="text-xs text-muted-foreground mt-1">Sistema de Gestión del Laboratorio</p>
+            </div>
+            
+            <!-- Navigation -->
+            <nav class="flex-1 overflow-y-auto p-4 space-y-1">
+                <button onclick="cambiarVista('general')" class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors sidebar-active" id="nav-general">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                    Visión General
+                </button>
+                
+                <button onclick="cambiarVista('kpi')" class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors" id="nav-kpi">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    Indicadores KPI
+                </button>
+                
+                <button onclick="cambiarVista('graficas')" class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors" id="nav-graficas">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/>
+                    </svg>
+                    Gráficas
+                </button>
+                
+                <button onclick="cambiarVista('tablas')" class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors" id="nav-tablas">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                    Tablas Detalladas
+                </button>
+                
+                <button onclick="cambiarVista('analisis')" class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors" id="nav-analisis">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                    </svg>
+                    Análisis Avanzado
+                </button>
+                
+                <button onclick="cambiarVista('alertas')" class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors" id="nav-alertas">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                    </svg>
+                    Alertas
+                    <span id="alertBadge" class="ml-auto bg-destructive text-white text-xs font-semibold px-2 py-0.5 rounded-full">0</span>
+                </button>
+
+                <button onclick="cambiarVista('equipo')" class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md hover:bg-muted transition-colors" id="nav-equipo">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                    Gestión de Equipo
+                </button>
+            </nav>
+            
+            <!-- User Info -->
+            <div class="p-4 border-t border-border">
+                <div class="flex items-center  gap-1 mb-3 mx-4">
+                   
+                    <div class="flex-1">
+                        <p id="analista" class="text-sm font-medium">Analista: </p>
+                        
+                    </div>
+
+                     <div id="avatar" class="w-20 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
+                     
+                    </div>
+                </div>
+                <!-- Selector de Puesto de Trabajo -->
+                <div class="mt-2">
+                    <label for="puestoTrabajoSelect" class="block text-xs font-medium text-muted-foreground mb-1">
+                        Filtrar por Personal
+                    </label>
+                    <select id="puestoTrabajoSelect" 
+                            onchange="filtrarPorPuestoTrabajo(this.value)"
+                            class="w-full px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                        <option value="">Todo el personal</option>
+                    </select>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto">
+            <!-- Top Bar -->
+            <header class="bg-card border-b border-border px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 id="pageTitle" class="text-2xl font-semibold text-foreground">Visión General</h1>
+                        <p id="pageSubtitle" class="text-sm text-muted-foreground">Resumen de todas las muestras del laboratorio</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="exportarDatos()" class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            Exportar
+                        </button>
+                        <div class="text-right">
+                            <p class="text-xs text-muted-foreground">Última actualización</p>
+                            <p class="text-sm font-medium" id="lastUpdate">-</p>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="p-6">
+                <!-- Upload Section (shown when no data) -->
+                <div id="uploadSection" class="max-w-2xl mx-auto">
+                    <div id="dropZone" class="border-2 border-dashed border-border rounded-lg p-12 text-center transition-all hover:border-primary/50 cursor-pointer">
+                        <div class="flex flex-col items-center gap-4">
+                            <div class="rounded-full bg-secondary p-4">
+                                <svg class="h-8 w-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-foreground mb-1">Arrastra tu archivo Excel aquí</p>
+                                <p class="text-xs text-muted-foreground">o haz clic para seleccionar</p>
+                            </div>
+                            <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden" />
+                            <button onclick="document.getElementById('fileInput').click()" class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
+                                Seleccionar archivo
+                            </button>
+                            <p id="fileName" class="text-xs text-muted-foreground font-medium"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading -->
+                <div id="loading" class="hidden text-center py-12">
+                    <div class="inline-flex items-center gap-3 px-6 py-3 bg-secondary rounded-lg">
+                        <div class="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent"></div>
+                        <p class="text-sm font-medium text-foreground">Procesando datos...</p>
+                    </div>
+                </div>
+
+                <!-- Dashboard Views -->
+                <div id="dashboardContent" class="hidden">
+                    <!-- Vista General -->
+                    <div id="vista-general" class="space-y-6">
+                        <!-- KPI Cards -->
+                        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <div class="flex flex-row items-center justify-between pb-2">
+                                    <h3 class="text-sm font-medium text-muted-foreground">Total Muestras</h3>
+                                    <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div id="totalMuestras" class="text-2xl font-bold text-foreground">0</div>
+                                    <p class="text-xs text-muted-foreground mt-1">Muestras pendientes</p>
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <div class="flex flex-row items-center justify-between pb-2">
+                                    <h3 class="text-sm font-medium text-muted-foreground">Vencidas</h3>
+                                    <svg class="h-4 w-4 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div id="muestrasVencidas" class="text-2xl font-bold text-destructive">0</div>
+                                    <p class="text-xs text-muted-foreground mt-1">Requieren atención inmediata</p>
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <div class="flex flex-row items-center justify-between pb-2">
+                                    <h3 class="text-sm font-medium text-muted-foreground">Próximas a vencer</h3>
+                                    <svg class="h-4 w-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div id="muestrasProximas" class="text-2xl font-bold text-orange-600">0</div>
+                                    <p class="text-xs text-muted-foreground mt-1">Vencen en 7 días o menos</p>
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <div class="flex flex-row items-center justify-between pb-2">
+                                    <h3 class="text-sm font-medium text-muted-foreground">Tiempo promedio</h3>
+                                    <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div id="tiempoPromedio" class="text-2xl font-bold text-foreground">0</div>
+                                    <p class="text-xs text-muted-foreground mt-1">días de espera</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Charts Grid -->
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <h3 class="text-base font-semibold text-foreground mb-4">Distribución por Área</h3>
+                                <div class="chart-container">
+                                    <canvas id="areaChart"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <h3 class="text-base font-semibold text-foreground mb-4">Estado de Vencimientos</h3>
+                                <div class="chart-container">
+                                    <canvas id="vencimientoChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Alerts -->
+                        <div class="rounded-lg border border-border bg-card shadow-sm">
+                            <div class="p-6 border-b border-border">
+                                <h3 class="text-base font-semibold text-foreground">Alertas Recientes</h3>
+                            </div>
+                            <div class="p-6">
+                                <div id="recentAlerts" class="space-y-3"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vista KPI -->
+                    <div id="vista-kpi" class="hidden space-y-6">
+                        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                            <!-- KPI Cards Detallados -->
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <h3 class="text-sm font-medium text-muted-foreground mb-4">Tasa de Cumplimiento</h3>
+                                <div class="text-3xl font-bold text-foreground mb-2" id="kpiCumplimiento">0%</div>
+                                <div class="w-full bg-secondary rounded-full h-2">
+                                    <div id="kpiCumplimientoBar" class="bg-green-600 h-full rounded-full transition-all" style="width: 0%"></div>
+                                </div>
+                                <p class="text-xs text-muted-foreground mt-2">Muestras entregadas a tiempo</p>
+                            </div>
+
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <h3 class="text-sm font-medium text-muted-foreground mb-4">Eficiencia Operativa</h3>
+                                <div class="text-3xl font-bold text-foreground mb-2" id="kpiEficiencia">0%</div>
+                                <div class="w-full bg-secondary rounded-full h-2">
+                                    <div id="kpiEficienciaBar" class="bg-blue-600 h-full rounded-full transition-all" style="width: 0%"></div>
+                                </div>
+                                <p class="text-xs text-muted-foreground mt-2">Relación tiempo real vs plazo</p>
+                            </div>
+
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <h3 class="text-sm font-medium text-muted-foreground mb-4">Carga Promedio</h3>
+                                <div class="text-3xl font-bold text-foreground mb-2" id="kpiCargaPromedio">0</div>
+                                <p class="text-xs text-muted-foreground mt-2">Muestras por persona</p>
+                            </div>
+
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <h3 class="text-sm font-medium text-muted-foreground mb-4">Clientes Activos</h3>
+                                <div class="text-3xl font-bold text-foreground mb-2" id="kpiClientesActivos">0</div>
+                                <p class="text-xs text-muted-foreground mt-2">Clientes con muestras pendientes</p>
+                            </div>
+
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <h3 class="text-sm font-medium text-muted-foreground mb-4">Métodos Utilizados</h3>
+                                <div class="text-3xl font-bold text-foreground mb-2" id="kpiMetodos">0</div>
+                                <p class="text-xs text-muted-foreground mt-2">Métodos de análisis diferentes</p>
+                            </div>
+
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <h3 class="text-sm font-medium text-muted-foreground mb-4">Tiempo Respuesta</h3>
+                                <div class="text-3xl font-bold text-foreground mb-2" id="kpiTiempoRespuesta">0d</div>
+                                <p class="text-xs text-muted-foreground mt-2">Tiempo medio de análisis</p>
+                            </div>
+                        </div>
+
+                        <!-- Trends -->
+                        <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                            <h3 class="text-base font-semibold text-foreground mb-4">Tendencias de Rendimiento</h3>
+                            <div class="chart-container" style="height: 400px;">
+                                <canvas id="trendsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vista Gráficas -->
+                    <div id="vista-graficas" class="hidden space-y-6">
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <h3 class="text-base font-semibold text-foreground mb-4">Distribución por Área</h3>
+                                <div class="chart-container">
+                                    <canvas id="areaChart2"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <h3 class="text-base font-semibold text-foreground mb-4">Top 5 Clientes</h3>
+                                <div class="chart-container">
+                                    <canvas id="clienteChart"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <h3 class="text-base font-semibold text-foreground mb-4">Distribución por Matriz</h3>
+                                <div class="chart-container">
+                                    <canvas id="matrizChart"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                                <h3 class="text-base font-semibold text-foreground mb-4">Muestras por Método</h3>
+                                <div class="chart-container">
+                                    <canvas id="metodoChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                            <h3 class="text-base font-semibold text-foreground mb-4">Evolución de Carga de Trabajo</h3>
+                            <div class="chart-container" style="height: 400px;">
+                                <canvas id="evolucionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vista Tablas -->
+                    <div id="vista-tablas" class="hidden space-y-6">
+                        <!-- Filtros Avanzados -->
+                        <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                            <h3 class="text-base font-semibold text-foreground mb-4">Filtros</h3>
+                            <div class="grid gap-4 md:grid-cols-4">
+                                <select id="filterArea" class="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                    <option value="">Todas las áreas</option>
+                                </select>
+                                <select id="filterCliente" class="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                    <option value="">Todos los clientes</option>
+                                </select>
+                                <select id="filterEstado" class="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+                                    <option value="">Todos los estados</option>
+                                    <option value="vencido">Vencidos</option>
+                                    <option value="proximo">Próximos a vencer</option>
+                                    <option value="ok">En plazo</option>
+                                </select>
+                                <select id="filterPersona" class="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
+<option value="">Todas las personas</option>
+</select>
+</div>
+</div>
+                    <!-- Tabla Principal -->
+                    <div class="rounded-lg border border-border bg-card shadow-sm">
+                        <div class="p-6 border-b border-border flex items-center justify-between">
+                            <h3 class="text-base font-semibold text-foreground">Todas las Muestras</h3>
+                            <div class="flex gap-2">
+                                <input type="text" id="searchTable" placeholder="Buscar..." class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm">
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <div class="max-h-96 overflow-y-auto">
+                                <table class="w-full">
+                                    <thead class="border-b border-border bg-muted/50 sticky top-0">
+                                        <tr>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Muestra</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Cliente</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Parámetro</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Área</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Persona</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Fecha Límite</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Días Espera</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tablaPrincipal" class="[&_tr:last-child]:border-0"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vista Análisis Avanzado -->
+                <div id="vista-analisis" class="hidden space-y-6">
+                    <div class="grid gap-6 md:grid-cols-2">
+                        <!-- Análisis por Prioridad -->
+                        <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                            <h3 class="text-base font-semibold text-foreground mb-4">Distribución por Prioridad</h3>
+                            <div id="analisisPrioridad" class="space-y-3"></div>
+                        </div>
+
+                        <!-- Top Parámetros -->
+                        <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                            <h3 class="text-base font-semibold text-foreground mb-4">Top 10 Parámetros</h3>
+                            <div class="chart-container">
+                                <canvas id="parametrosChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Análisis Temporal -->
+                        <div class="rounded-lg border border-border bg-card p-6 shadow-sm col-span-2">
+                            <h3 class="text-base font-semibold text-foreground mb-4">Análisis de Plazos</h3>
+                            <div class="chart-container" style="height: 350px;">
+                                <canvas id="plazosChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vista Alertas -->
+                <div id="vista-alertas" class="hidden space-y-6">
+                    <div class="rounded-lg border border-border bg-card shadow-sm">
+                        <div class="p-6 border-b border-border">
+                            <h3 class="text-base font-semibold text-foreground">Alertas Críticas</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <div class="max-h-96 overflow-y-auto">
+                                <table class="w-full">
+                                    <thead class="border-b border-border bg-muted/50">
+                                        <tr>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Muestra</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Cliente</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Parámetro</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Área</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Fecha Límite</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Días Espera</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="alertasBody" class="[&_tr:last-child]:border-0"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vista Equipo -->
+                <div id="vista-equipo" class="hidden space-y-6">
+                    <div class="rounded-lg border border-border bg-card shadow-sm">
+                        <div class="p-6 border-b border-border">
+                            <h3 class="text-base font-semibold text-foreground">Carga de Trabajo por Persona</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="border-b border-border bg-muted/50">
+                                    <tr>
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Persona</th>
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Muestras</th>
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Vencidas</th>
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Próximas</th>
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Rendimiento</th>
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground text-xs">Carga</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cargaPersonaBody" class="[&_tr:last-child]:border-0"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Distribución de Carga -->
+                    <div class="rounded-lg border border-border bg-card p-6 shadow-sm">
+                        <h3 class="text-base font-semibold text-foreground mb-4">Distribución de Carga de Trabajo</h3>
+                        <div class="chart-container" style="height: 400px;">
+                            <canvas id="cargaEquipoChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+    let datosGlobales = [];
+    let datosOriginales = []; // Nueva variable para guardar datos sin filtrar
+    let charts = {};
+    let vistaActual = 'general';
+    let puestoTrabajoActual = ''; // Variable para el puesto de trabajo seleccionado
+
+    // Función para poblar el selector de puestos de trabajo
+    function poblarPuestosTrabajo() {
+        const personal = [...new Set(datosOriginales.map(d => d.Personal || d.Persona))].filter(Boolean).sort();
+        
+        const selectPuesto = document.getElementById('puestoTrabajoSelect');
+        if (selectPuesto) {
+            selectPuesto.innerHTML = '<option value="">Todo el personal</option>' + 
+                personal.map(p => `<option value="${p}">${p}</option>`).join('');
+        }
+    }
+
+    // Función para filtrar datos por puesto de trabajo
+    function filtrarPorPuestoTrabajo(puesto) {
+        puestoTrabajoActual = puesto;
+
+        // 🔹 ACTUALIZAR AVATAR AQUÍ
+        const avatar = document.getElementById("avatar");
+        const select = document.getElementById("puestoTrabajoSelect");
+        
+/*         if (puesto === '') {
+            // Si no hay puesto seleccionado, mostrar todos los datos
+            datosGlobales = [...datosOriginales];
+        } else {
+            // Filtrar por el personal seleccionado
+            datosGlobales = datosOriginales.filter(d => {
+                const personal = d.Personal || d.Persona || '';
+                return personal === puesto;
+            });
+        } */
+
+
+/*         if (avatar && select) {
+            const texto = select.options[select.selectedIndex].text;
+
+            if (puesto === '') {
+                avatar.textContent = "TP"; // Todo el personal
+            } else {
+                avatar.textContent = texto
+                    .split(" ")
+                    .map(p => p.charAt(0))
+                    .join("")
+                    .toUpperCase();
+            }
+        } */
+
+                if (avatar && select) {
+            const texto = select.options[select.selectedIndex].text;
+
+            if (puesto === '') {
+                avatar.textContent = "TODOS"; // Todo el personal
+            } else {
+                avatar.textContent = texto
+                    .toUpperCase();
+            }
+        }
+        
+        // Actualizar todo el dashboard con los datos filtrados
+        actualizarDashboard();
+        
+        // Actualizar la vista actual si no es la general
+        if (vistaActual !== 'general') {
+            renderVista(vistaActual);
+        }
+        
+        // Mostrar mensaje si no hay datos para el personal seleccionado
+        if (datosGlobales.length === 0 && puesto !== '') {
+            alert('No hay muestras asignadas a esta persona');
+        }
+    }
+
+
+    // Drag & Drop functionality
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'), false);
+    });
+
+    dropZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+    }
+
+    fileInput.addEventListener('change', function(e) {
+        handleFiles(e.target.files);
+    });
+
+    function handleFiles(files) {
+        if (files.length === 0) return;
+        const file = files[0];
+        
+        if (!file.name.match(/\.(xlsx|xls)$/)) {
+            alert('Por favor, selecciona un archivo Excel (.xlsx o .xls)');
+            return;
+        }
+        
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('uploadSection').classList.add('hidden');
+        document.getElementById('loading').classList.remove('hidden');
+        
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+                    raw: false,
+                    dateNF: 'yyyy-mm-dd'
+                });
+                
+                datosOriginales = procesarDatos(jsonData); // Guardar datos originales
+                datosGlobales = [...datosOriginales]; // Copiar a datos globales
+                
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('dashboardContent').classList.remove('hidden');
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleString('es-ES');
+                
+                poblarPuestosTrabajo(); // Poblar selector de puestos de trabajo
+                actualizarDashboard();
+            } catch (error) {
+                alert('Error al leer el archivo Excel: ' + error.message);
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('uploadSection').classList.remove('hidden');
+            }
+        };
+        
+        reader.readAsArrayBuffer(file);
+    }
+
+    function procesarDatos(data) {
+        const hoy = new Date();
+        
+        return data.map(row => {
+            const fechaLimite = new Date(row['Fecha Limite']);
+            const diasParaVencer = Math.ceil((fechaLimite - hoy) / (1000 * 60 * 60 * 24));
+            
+            let estadoVencimiento = 'ok';
+            if (diasParaVencer < 0) {
+                estadoVencimiento = 'vencido';
+            } else if (diasParaVencer <= 7) {
+                estadoVencimiento = 'proximo';
+            }
+            
+            return {
+                ...row,
+                diasParaVencer: diasParaVencer,
+                estadoVencimiento: estadoVencimiento
+            };
+        });
+    }
+
+    function cambiarVista(vista) {
+        // Remove active class from all nav buttons
+        document.querySelectorAll('aside button').forEach(btn => {
+            btn.classList.remove('sidebar-active');
+        });
+        
+        // Add active class to clicked button
+        document.getElementById(`nav-${vista}`).classList.add('sidebar-active');
+        
+        // Hide all views
+        const vistas = ['general', 'kpi', 'graficas', 'tablas', 'analisis', 'alertas', 'equipo'];
+        vistas.forEach(v => {
+            const elem = document.getElementById(`vista-${v}`);
+            if (elem) elem.classList.add('hidden');
+        });
+        
+        // Show selected view
+        const vistaElem = document.getElementById(`vista-${vista}`);
+        if (vistaElem) vistaElem.classList.remove('hidden');
+        
+        vistaActual = vista;
+        
+        // Update title
+        const titles = {
+            'general': ['Visión General', 'Resumen de todas las muestras del laboratorio'],
+            'kpi': ['Indicadores KPI', 'Métricas clave de rendimiento'],
+            'graficas': ['Gráficas', 'Visualización de datos'],
+            'tablas': ['Tablas Detalladas', 'Vista completa de todas las muestras'],
+            'analisis': ['Análisis Avanzado', 'Análisis y tendencias'],
+            'alertas': ['Alertas', 'Muestras que requieren atención'],
+            'equipo': ['Gestión de Equipo', 'Carga de trabajo por persona']
+        };
+        
+        if (titles[vista]) {
+            document.getElementById('pageTitle').textContent = titles[vista][0];
+            document.getElementById('pageSubtitle').textContent = titles[vista][1];
+        }
+        
+        // Render specific view content
+        if (datosGlobales.length > 0) {
+            renderVista(vista);
+        }
+    }
+
+    function renderVista(vista) {
+        switch(vista) {
+            case 'kpi':
+                actualizarKPIsAvanzados();
+                break;
+            case 'graficas':
+                actualizarGraficasAvanzadas();
+                break;
+            case 'tablas':
+                actualizarTablaPrincipal();
+                break;
+            case 'analisis':
+                actualizarAnalisisAvanzado();
+                break;
+            case 'alertas':
+                actualizarTablaAlertas();
+                break;
+            case 'equipo':
+                actualizarCargaTrabajo();
+                actualizarGraficoEquipo();
+                break;
+        }
+    }
+
+    function actualizarDashboard() {
+        actualizarKPIs();
+        actualizarGraficos();
+        actualizarAlertasRecientes();
+        poblarFiltros();
+        actualizarBadgeAlertas();
+    }
+
+    function actualizarKPIs() {
+        const total = datosGlobales.length;
+        const vencidas = datosGlobales.filter(d => d.estadoVencimiento === 'vencido').length;
+        const proximas = datosGlobales.filter(d => d.estadoVencimiento === 'proximo').length;
+        const promedioDias = (datosGlobales.reduce((sum, d) => sum + parseInt(d['Dias Espera'] || 0), 0) / total).toFixed(1);
+        
+        document.getElementById('totalMuestras').textContent = total;
+        document.getElementById('muestrasVencidas').textContent = vencidas;
+        document.getElementById('muestrasProximas').textContent = proximas;
+        document.getElementById('tiempoPromedio').textContent = promedioDias;
+    }
+
+    function actualizarBadgeAlertas() {
+        const alertas = datosGlobales.filter(d => d.estadoVencimiento !== 'ok').length;
+        document.getElementById('alertBadge').textContent = alertas;
+    }
+
+    function actualizarGraficos() {
+        const areaCount = {};
+        datosGlobales.forEach(d => {
+            const area = d.Area || 'Sin área';
+            areaCount[area] = (areaCount[area] || 0) + 1;
+        });
+        
+        crearGrafico('areaChart', 'doughnut', Object.keys(areaCount), Object.values(areaCount), 
+            ['hsl(222.2 47.4% 11.2%)', 'hsl(215.4 16.3% 46.9%)', 'hsl(0 84.2% 60.2%)', 'hsl(24.6 95% 53.1%)', 'hsl(142.1 76.2% 36.3%)']);
+        
+        const vencimientoCount = {
+            'Vencidas': datosGlobales.filter(d => d.estadoVencimiento === 'vencido').length,
+            'Próximas (≤7 días)': datosGlobales.filter(d => d.estadoVencimiento === 'proximo').length,
+            'En plazo': datosGlobales.filter(d => d.estadoVencimiento === 'ok').length
+        };
+        
+        crearGrafico('vencimientoChart', 'bar', 
+            Object.keys(vencimientoCount), 
+            Object.values(vencimientoCount),
+            ['hsl(0 84.2% 60.2%)', 'hsl(24.6 95% 53.1%)', 'hsl(142.1 76.2% 36.3%)']);
+    }
+
+    function actualizarKPIsAvanzados() {
+        const total = datosGlobales.length;
+        const enPlazo = datosGlobales.filter(d => d.estadoVencimiento === 'ok').length;
+        const tasaCumplimiento = ((enPlazo / total) * 100).toFixed(1);
+        
+        document.getElementById('kpiCumplimiento').textContent = tasaCumplimiento + '%';
+        document.getElementById('kpiCumplimientoBar').style.width = tasaCumplimiento + '%';
+        
+        const promedioEspera = datosGlobales.reduce((sum, d) => sum + parseInt(d['Dias Espera'] || 0), 0) / total;
+        const promedioPlazo = datosGlobales.reduce((sum, d) => sum + parseInt(d['Dias Plazo'] || 0), 0) / total;
+        const eficiencia = ((1 - (promedioEspera / promedioPlazo)) * 100).toFixed(1);
+        
+        document.getElementById('kpiEficiencia').textContent = eficiencia + '%';
+        document.getElementById('kpiEficienciaBar').style.width = eficiencia + '%';
+        
+        const personas = [...new Set(datosGlobales.map(d => d.Persona))].filter(Boolean);
+        const cargaPromedio = (total / personas.length).toFixed(1);
+        document.getElementById('kpiCargaPromedio').textContent = cargaPromedio;
+        
+        const clientesActivos = [...new Set(datosGlobales.map(d => d.Cliente))].filter(Boolean).length;
+        document.getElementById('kpiClientesActivos').textContent = clientesActivos;
+        
+        const metodos = [...new Set(datosGlobales.map(d => d.Metodo))].filter(Boolean).length;
+        document.getElementById('kpiMetodos').textContent = metodos;
+        
+        document.getElementById('kpiTiempoRespuesta').textContent = promedioEspera.toFixed(1) + 'd';
+        
+        // Gráfico de tendencias
+        crearGraficoLineas();
+    }
+
+    function crearGraficoLineas() {
+        const ctx = document.getElementById('trendsChart');
+        if (charts['trendsChart']) charts['trendsChart'].destroy();
+        
+        // Simular datos de tendencia por semana
+        charts['trendsChart'] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'],
+                datasets: [{
+                    label: 'Muestras Completadas',
+                    data: [45, 52, 48, 61],
+                    borderColor: 'hsl(142.1 76.2% 36.3%)',
+                    backgroundColor: 'hsla(142.1 76.2% 36.3% / 0.1)',
+                    tension: 0.4
+                }, {
+                    label: 'Muestras Vencidas',
+                    data: [8, 5, 7, 4],
+                    borderColor: 'hsl(0 84.2% 60.2%)',
+                    backgroundColor: 'hsla(0 84.2% 60.2% / 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    function actualizarGraficasAvanzadas() {
+        // Área
+        const areaCount = {};
+        datosGlobales.forEach(d => {
+            const area = d.Area || 'Sin área';
+            areaCount[area] = (areaCount[area] || 0) + 1;
+        });
+        crearGrafico('areaChart2', 'doughnut', Object.keys(areaCount), Object.values(areaCount), 
+            ['hsl(222.2 47.4% 11.2%)', 'hsl(215.4 16.3% 46.9%)', 'hsl(0 84.2% 60.2%)', 'hsl(24.6 95% 53.1%)', 'hsl(142.1 76.2% 36.3%)']);
+        
+        // Clientes
+        const clienteCount = {};
+        datosGlobales.forEach(d => {
+            const cliente = d.Cliente?.substring(0, 30) || 'Sin cliente';
+            clienteCount[cliente] = (clienteCount[cliente] || 0) + 1;
+        });
+        const topClientes = Object.entries(clienteCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        crearGrafico('clienteChart', 'bar', topClientes.map(c => c[0]), topClientes.map(c => c[1]), ['hsl(222.2 47.4% 11.2%)']);
+        
+        // Matriz
+        const matrizCount = {};
+        datosGlobales.forEach(d => {
+            const matriz = d.Matriz || 'Sin matriz';
+            matrizCount[matriz] = (matrizCount[matriz] || 0) + 1;
+        });
+        crearGrafico('matrizChart', 'pie', Object.keys(matrizCount), Object.values(matrizCount),
+            ['hsl(222.2 47.4% 11.2%)', 'hsl(215.4 16.3% 46.9%)', 'hsl(0 84.2% 60.2%)', 'hsl(24.6 95% 53.1%)', 'hsl(142.1 76.2% 36.3%)']);
+        
+        // Métodos
+        const metodoCount = {};
+        datosGlobales.forEach(d => {
+            const metodo = d.Metodo?.substring(0, 30) || 'Sin método';
+            metodoCount[metodo] = (metodoCount[metodo] || 0) + 1;
+        });
+        const topMetodos = Object.entries(metodoCount).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        crearGrafico('metodoChart', 'bar', topMetodos.map(m => m[0]), topMetodos.map(m => m[1]), ['hsl(222.2 47.4% 11.2%)']);
+        
+        // Evolución (simulada)
+        const ctx = document.getElementById('evolucionChart');
+        if (charts['evolucionChart']) charts['evolucionChart'].destroy();
+        
+        charts['evolucionChart'] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'],
+                datasets: [{
+                    label: 'Carga de Trabajo',
+                    data: [65, 59, 80, 81, 76, datosGlobales.length],
+                    borderColor: 'hsl(222.2 47.4% 11.2%)',
+                    backgroundColor: 'hsla(222.2 47.4% 11.2% / 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+
+    function actualizarTablaPrincipal() {
+        const tbody = document.getElementById('tablaPrincipal');
+        const aplicarFiltrosTabla = () => {
+            const area = document.getElementById('filterArea').value;
+            const cliente = document.getElementById('filterCliente').value;
+            const estado = document.getElementById('filterEstado').value;
+            const persona = document.getElementById('filterPersona').value;
+            const busqueda = document.getElementById('searchTable').value.toLowerCase();
+            
+            let filtrados = datosGlobales;
+            
+            if (area) filtrados = filtrados.filter(d => d.Area === area);
+            if (cliente) filtrados = filtrados.filter(d => d.Cliente === cliente);
+            if (estado) filtrados = filtrados.filter(d => d.estadoVencimiento === estado);
+            if (persona) filtrados = filtrados.filter(d => d.Persona === persona);
+            if (busqueda) {
+                filtrados = filtrados.filter(d => 
+                    d.Muestra?.toLowerCase().includes(busqueda) ||
+                    d.Cliente?.toLowerCase().includes(busqueda) ||
+                    d.Parametro?.toLowerCase().includes(busqueda)
+                );
+            }
+            
+            tbody.innerHTML = filtrados.map(d => `
+                <tr class="border-b border-border transition-colors hover:bg-muted/50">
+                    <td class="p-4 align-middle text-sm font-medium">${d.Muestra}</td>
+                    <td class="p-4 align-middle text-sm text-muted-foreground">${d.Cliente?.substring(0, 30) || '-'}</td>
+                    <td class="p-4 align-middle text-sm text-muted-foreground">${d.Parametro || '-'}</td>
+                    <td class="p-4 align-middle text-sm text-muted-foreground">${d.Area || '-'}</td>
+                    <td class="p-4 align-middle text-sm text-muted-foreground">${d.Persona || '-'}</td>
+                    <td class="p-4 align-middle text-sm text-muted-foreground">${d['Fecha Limite']}</td>
+                    <td class="p-4 align-middle text-sm text-muted-foreground">${d['Dias Espera']}</td>
+                    <td class="p-4 align-middle">
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            d.estadoVencimiento === 'vencido' ? 'bg-destructive/10 text-destructive' : 
+                            d.estadoVencimiento === 'proximo' ? 'bg-orange-100 text-orange-800' : 
+                            'bg-green-100 text-green-800'
+                        }">
+                            ${d.estadoVencimiento === 'vencido' ? 'Vencido' : 
+                              d.estadoVencimiento === 'proximo' ? 'Próximo' : 'En plazo'}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        };
+        
+        aplicarFiltrosTabla();
+        document.getElementById('searchTable').addEventListener('input', aplicarFiltrosTabla);
+    }
+
+    function actualizarAnalisisAvanzado() {
+        // Análisis por prioridad
+        const vencidas = datosGlobales.filter(d => d.estadoVencimiento === 'vencido').length;
+        const proximas = datosGlobales.filter(d => d.estadoVencimiento === 'proximo').length;
+        const enPlazo = datosGlobales.filter(d => d.estadoVencimiento === 'ok').length;
+        
+        document.getElementById('analisisPrioridad').innerHTML = `
+            <div class="flex items-center justify-between p-3 bg-destructive/10 rounded-lg">
+                <div>
+                    <p class="text-sm font-medium text-foreground">Alta prioridad</p>
+                    <p class="text-xs text-muted-foreground">Vencidas</p>
+                </div>
+                <div class="text-2xl font-bold text-destructive">${vencidas}</div>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                <div>
+                    <p class="text-sm font-medium text-foreground">Media prioridad</p>
+                    <p class="text-xs text-muted-foreground">Próximas a vencer</p>
+                </div>
+                <div class="text-2xl font-bold text-orange-600">${proximas}</div>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <div>
+                    <p class="text-sm font-medium text-foreground">Baja prioridad</p>
+
+
+                                                    <p class="text-xs text-muted-foreground">En plazo</p>
+                </div>
+                <div class="text-2xl font-bold text-green-600">${enPlazo}</div>
+            </div>
+        `;
+        
+        // Top 10 Parámetros
+        const parametroCount = {};
+        datosGlobales.forEach(d => {
+            const param = d.Parametro || 'Sin parámetro';
+            parametroCount[param] = (parametroCount[param] || 0) + 1;
+        });
+        const topParametros = Object.entries(parametroCount).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        crearGrafico('parametrosChart', 'bar', topParametros.map(p => p[0]), topParametros.map(p => p[1]), 
+            ['hsl(222.2 47.4% 11.2%)']);
+        
+        // Análisis de Plazos
+        const ctx = document.getElementById('plazosChart');
+        if (charts['plazosChart']) charts['plazosChart'].destroy();
+        
+        const plazosData = datosGlobales.map(d => ({
+            x: parseInt(d['Dias Plazo'] || 0),
+            y: parseInt(d['Dias Espera'] || 0)
+        }));
+        
+        charts['plazosChart'] = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Días Espera vs Días Plazo',
+                    data: plazosData,
+                    backgroundColor: 'hsla(222.2 47.4% 11.2% / 0.6)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Días de Plazo'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Días de Espera'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function actualizarAlertasRecientes() {
+        const alertas = datosGlobales
+            .filter(d => d.estadoVencimiento !== 'ok')
+            .sort((a, b) => a.diasParaVencer - b.diasParaVencer)
+            .slice(0, 5);
+        
+        document.getElementById('recentAlerts').innerHTML = alertas.map(d => `
+            <div class="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-foreground">${d.Muestra} - ${d.Parametro}</p>
+                    <p class="text-xs text-muted-foreground">${d.Cliente?.substring(0, 40)}</p>
+                </div>
+                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    d.estadoVencimiento === 'vencido' ? 'bg-destructive/10 text-destructive' : 'bg-orange-100 text-orange-800'
+                }">
+                    ${d.estadoVencimiento === 'vencido' ? 'Vencido' : 'Próximo'}
+                </span>
+            </div>
+        `).join('');
+    }
+
+    function actualizarTablaAlertas() {
+        const tbody = document.getElementById('alertasBody');
+        const alertas = datosGlobales
+            .filter(d => d.estadoVencimiento !== 'ok')
+            .sort((a, b) => a.diasParaVencer - b.diasParaVencer);
+        
+        tbody.innerHTML = alertas.map(d => `
+            <tr class="border-b border-border transition-colors hover:bg-muted/50">
+                <td class="p-4 align-middle text-sm font-medium">${d.Muestra}</td>
+                <td class="p-4 align-middle text-sm text-muted-foreground">${d.Cliente?.substring(0, 30) || '-'}</td>
+                <td class="p-4 align-middle text-sm text-muted-foreground">${d.Parametro || '-'}</td>
+                <td class="p-4 align-middle text-sm text-muted-foreground">${d.Area || '-'}</td>
+                <td class="p-4 align-middle text-sm text-muted-foreground">${d['Fecha Limite']}</td>
+                <td class="p-4 align-middle text-sm text-muted-foreground">${d['Dias Espera']}</td>
+                <td class="p-4 align-middle">
+                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        d.estadoVencimiento === 'vencido' ? 'bg-destructive/10 text-destructive' : 'bg-orange-100 text-orange-800'
+                    }">
+                        ${d.estadoVencimiento === 'vencido' ? 'Vencido' : 'Próximo'}
+                    </span>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function actualizarCargaTrabajo() {
+        const cargaPorPersona = {};
+        
+        datosGlobales.forEach(d => {
+            const persona = d.Persona || 'Sin asignar';
+            if (!cargaPorPersona[persona]) {
+                cargaPorPersona[persona] = { total: 0, vencidas: 0, proximas: 0 };
+            }
+            
+            cargaPorPersona[persona].total++;
+            if (d.estadoVencimiento === 'vencido') cargaPorPersona[persona].vencidas++;
+            if (d.estadoVencimiento === 'proximo') cargaPorPersona[persona].proximas++;
+        });
+        
+        const maxCarga = Math.max(...Object.values(cargaPorPersona).map(c => c.total));
+        const tbody = document.getElementById('cargaPersonaBody');
+        
+        tbody.innerHTML = Object.entries(cargaPorPersona)
+            .sort((a, b) => b[1].total - a[1].total)
+            .map(([persona, carga]) => {
+                const rendimiento = (((carga.total - carga.vencidas) / carga.total) * 100).toFixed(0);
+                return `
+                <tr class="border-b border-border transition-colors hover:bg-muted/50">
+                    <td class="p-4 align-middle text-sm font-medium">${persona}</td>
+                    <td class="p-4 align-middle text-sm text-muted-foreground">${carga.total}</td>
+                    <td class="p-4 align-middle text-sm font-semibold text-destructive">${carga.vencidas}</td>
+                    <td class="p-4 align-middle text-sm font-semibold text-orange-600">${carga.proximas}</td>
+                    <td class="p-4 align-middle">
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            rendimiento >= 90 ? 'bg-green-100 text-green-800' :
+                            rendimiento >= 70 ? 'bg-orange-100 text-orange-800' :
+                            'bg-destructive/10 text-destructive'
+                        }">
+                            ${rendimiento}%
+                        </span>
+                    </td>
+                    <td class="p-4 align-middle">
+                        <div class="w-full bg-secondary rounded-full h-2 overflow-hidden">
+                            <div class="bg-primary h-full rounded-full transition-all duration-300" style="width: ${(carga.total / maxCarga) * 100}%"></div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            }).join('');
+    }
+
+    function actualizarGraficoEquipo() {
+        const ctx = document.getElementById('cargaEquipoChart');
+        if (charts['cargaEquipoChart']) charts['cargaEquipoChart'].destroy();
+        
+        const cargaPorPersona = {};
+        datosGlobales.forEach(d => {
+            const persona = d.Persona || 'Sin asignar';
+            if (!cargaPorPersona[persona]) {
+                cargaPorPersona[persona] = { total: 0, vencidas: 0, proximas: 0, ok: 0 };
+            }
+            cargaPorPersona[persona].total++;
+            if (d.estadoVencimiento === 'vencido') cargaPorPersona[persona].vencidas++;
+            else if (d.estadoVencimiento === 'proximo') cargaPorPersona[persona].proximas++;
+            else cargaPorPersona[persona].ok++;
+        });
+        
+        const personas = Object.keys(cargaPorPersona).sort((a, b) => 
+            cargaPorPersona[b].total - cargaPorPersona[a].total
+        ).slice(0, 10);
+        
+        charts['cargaEquipoChart'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: personas,
+                datasets: [{
+                    label: 'En plazo',
+                    data: personas.map(p => cargaPorPersona[p].ok),
+                    backgroundColor: 'hsl(142.1 76.2% 36.3%)'
+                }, {
+                    label: 'Próximas',
+                    data: personas.map(p => cargaPorPersona[p].proximas),
+                    backgroundColor: 'hsl(24.6 95% 53.1%)'
+                }, {
+                    label: 'Vencidas',
+                    data: personas.map(p => cargaPorPersona[p].vencidas),
+                    backgroundColor: 'hsl(0 84.2% 60.2%)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    function crearGrafico(canvasId, tipo, labels, data, colors) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        
+        if (charts[canvasId]) {
+            charts[canvasId].destroy();
+        }
+        
+        charts[canvasId] = new Chart(ctx, {
+            type: tipo,
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors,
+                    borderWidth: 0,
+                    borderRadius: tipo === 'bar' ? 4 : 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: tipo === 'bar' ? 'top' : 'right',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 12,
+                            font: {
+                                size: 11,
+                                family: 'Inter'
+                            }
+                        }
+                    }
+                },
+                scales: tipo === 'bar' ? {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                } : {}
+            }
+        });
+    }
+
+    function poblarFiltros() {
+        const areas = [...new Set(datosGlobales.map(d => d.Area))].filter(Boolean).sort();
+        const clientes = [...new Set(datosGlobales.map(d => d.Cliente))].filter(Boolean).sort();
+        const personas = [...new Set(datosGlobales.map(d => d.Persona))].filter(Boolean).sort();
+        
+        const filterArea = document.getElementById('filterArea');
+        const filterCliente = document.getElementById('filterCliente');
+        const filterPersona = document.getElementById('filterPersona');
+        
+        if (filterArea) {
+            filterArea.innerHTML = '<option value="">Todas las áreas</option>' + 
+                areas.map(a => `<option value="${a}">${a}</option>`).join('');
+        }
+        
+        if (filterCliente) {
+            filterCliente.innerHTML = '<option value="">Todos los clientes</option>' + 
+                clientes.map(c => `<option value="${c}">${c.substring(0, 40)}</option>`).join('');
+        }
+        
+        if (filterPersona) {
+            filterPersona.innerHTML = '<option value="">Todas las personas</option>' + 
+                personas.map(p => `<option value="${p}">${p}</option>`).join('');
+        }
+    }
+
+    function exportarDatos() {
+        if (datosGlobales.length === 0) {
+            alert('No hay datos para exportar');
+            return;
+        }
+        
+        const ws = XLSX.utils.json_to_sheet(datosGlobales);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Muestras");
+        XLSX.writeFile(wb, `reporte_lab_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
+</script>
+</body>
+</html>
