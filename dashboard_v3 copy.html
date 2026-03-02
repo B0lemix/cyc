@@ -116,23 +116,14 @@ html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));co
     </button>
   </nav>
   <div class="user-section p-4 border-t" style="border-color:hsl(var(--border))">
-    <div class="flex items-center gap-2 mb-3">
+    <div class="flex items-center gap-2 mb-2">
       <div id="avatar" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style="background:hsl(var(--primary));color:hsl(var(--primary-foreground))">?</div>
       <p id="analista" class="text-xs font-medium truncate">Sin seleccion</p>
     </div>
-    <label class="block text-xs font-medium mb-1" style="color:hsl(var(--muted-foreground))">Filtrar por Area</label>
-    <select id="areaSelect" onchange="filtrarGlobal()" class="w-full px-2 py-1.5 text-xs border rounded-md focus:outline-none mb-3" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
-      <option value="">Todas las areas</option>
-    </select>
     <label class="block text-xs font-medium mb-1" style="color:hsl(var(--muted-foreground))">Filtrar por Personal</label>
-    <div class="relative" id="personalDropdownWrap">
-      <button type="button" onclick="togglePersonalDropdown()" id="personalDropdownBtn" class="w-full text-left px-2 py-1.5 text-xs border rounded-md focus:outline-none flex items-center justify-between gap-1" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
-        <span id="personalDropdownLabel" class="truncate">Todo el personal</span>
-        <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-      </button>
-      <div id="personalDropdownMenu" class="hidden absolute bottom-full left-0 right-0 mb-1 border rounded-md shadow-lg max-h-52 overflow-y-auto z-50" style="background:hsl(var(--card));border-color:hsl(var(--border))"></div>
-    </div>
-    <button onclick="limpiarFiltros()" class="mt-2 w-full text-xs px-2 py-1 rounded border hover:bg-muted transition-colors" style="border-color:hsl(var(--border));color:hsl(var(--muted-foreground))">Limpiar filtros</button>
+    <select id="puestoTrabajoSelect" onchange="filtrarPorPuestoTrabajo(this.value)" class="w-full px-2 py-1.5 text-xs border rounded-md focus:outline-none" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
+      <option value="">Todo el personal</option>
+    </select>
   </div>
 </aside>
 <main class="flex-1 overflow-hidden flex flex-col min-w-0">
@@ -678,8 +669,7 @@ let datosGlobales   = [];
 let datosOriginales = [];
 let charts          = {};
 let vistaActual     = 'general';
-let personasActuales = [];
-let areaActual       = '';
+let puestoTrabajoActual = '';
 let tablaOrden      = { col: null, dir: 'asc' };
 let filtrosListenersAttached = false;
 let paginaActual    = 1;
@@ -832,7 +822,7 @@ function handleFiles(files) {
             document.getElementById('dashboardContent').classList.remove('hidden');
             document.getElementById('lastUpdate').textContent = new Date().toLocaleString('es-ES');
             document.getElementById('btnNuevoArchivo').classList.remove('hidden');
-            poblarAreas(); poblarPuestosTrabajo();
+            poblarPuestosTrabajo();
             actualizarDashboard();
             mostrarToast(datosOriginales.length + ' muestras cargadas correctamente', 'success');
         } catch(err) {
@@ -844,86 +834,27 @@ function handleFiles(files) {
     reader.readAsArrayBuffer(file);
 }
 
-// ─── Filters: Area + Personal (multi-select) ────────────────────────────────
-function poblarAreas() {
-    const areas = [...new Set(datosOriginales.map(d=>d.Area))].filter(Boolean).sort();
-    const sel = document.getElementById('areaSelect');
-    if (sel) {
-        sel.innerHTML = '<option value="">Todas las areas</option>' +
-            areas.map(a=>`<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
-    }
-}
+// ─── Personal Filter ────────────────────────────────────────────────────────
 function poblarPuestosTrabajo() {
     const personal = [...new Set(datosOriginales.map(d=>d.Persona))].filter(Boolean).sort();
-    const menu = document.getElementById('personalDropdownMenu');
-    if (!menu) return;
-    menu.innerHTML =
-        `<label class="flex items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-xs border-b" style="border-color:hsl(var(--border))">
-          <input type="checkbox" id="persona-all" onchange="onPersonaAllChange(this)" checked>
-          <span class="font-medium">Todo el personal</span>
-        </label>` +
-        personal.map(p=>
-            `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-muted cursor-pointer text-xs">
-              <input type="checkbox" value="${escHtml(p)}" class="persona-cb" onchange="filtrarGlobal()">
-              <span>${escHtml(p)}</span>
-            </label>`
-        ).join('');
-}
-function togglePersonalDropdown() {
-    const menu = document.getElementById('personalDropdownMenu');
-    if (menu) menu.classList.toggle('hidden');
-}
-function onPersonaAllChange(cb) {
-    if (cb.checked) {
-        document.querySelectorAll('.persona-cb').forEach(c=>{ c.checked=false; });
+    const sel = document.getElementById('puestoTrabajoSelect');
+    if (sel) {
+        sel.innerHTML = '<option value="">Todo el personal</option>' +
+            personal.map(p=>`<option value="${p}">${p}</option>`).join('');
     }
-    filtrarGlobal();
 }
-function filtrarGlobal() {
-    const areaEl = document.getElementById('areaSelect');
-    areaActual = areaEl ? areaEl.value : '';
-    const cbs = [...document.querySelectorAll('.persona-cb:checked')];
-    personasActuales = cbs.map(c=>c.value);
-    const cbAll = document.getElementById('persona-all');
-    if (cbAll) cbAll.checked = personasActuales.length === 0;
-    // Update avatar & label
+function filtrarPorPuestoTrabajo(puesto) {
+    puestoTrabajoActual = puesto;
+    datosGlobales = puesto === '' ? [...datosOriginales] : datosOriginales.filter(d=>(d.Persona||'')===puesto);
     const av = document.getElementById('avatar');
-    const analistaEl = document.getElementById('analista');
-    const lbl = document.getElementById('personalDropdownLabel');
-    if (personasActuales.length === 1) {
-        if (av) av.textContent = personasActuales[0].substring(0,3).toUpperCase();
-        if (analistaEl) analistaEl.textContent = personasActuales[0];
-        if (lbl) lbl.textContent = personasActuales[0];
-    } else if (personasActuales.length > 1) {
-        if (av) av.textContent = personasActuales.length+'P';
-        if (analistaEl) analistaEl.textContent = personasActuales.length+' personas';
-        if (lbl) lbl.textContent = personasActuales.length+' personas seleccionadas';
-    } else {
-        if (av) av.textContent = areaActual ? areaActual.substring(0,3).toUpperCase() : 'ALL';
-        if (analistaEl) analistaEl.textContent = areaActual ? 'Area: '+areaActual : 'Todo el personal';
-        if (lbl) lbl.textContent = 'Todo el personal';
-    }
-    datosGlobales = datosOriginales.filter(d=>{
-        const personaOk = personasActuales.length === 0 || personasActuales.includes(d.Persona||'');
-        const areaOk    = areaActual === '' || (d.Area||'') === areaActual;
-        return personaOk && areaOk;
-    });
+    const sel = document.getElementById('puestoTrabajoSelect');
+    if (av) av.textContent = puesto === '' ? 'ALL' : (sel.options[sel.selectedIndex].text.substring(0,3).toUpperCase());
+    document.getElementById('analista').textContent = puesto || 'Todo el personal';
     ribbonFilterActivo = ''; quickFilterActivo = '';
     actualizarDashboard();
     if (vistaActual !== 'general') renderVista(vistaActual);
-    if (datosGlobales.length === 0 && (personasActuales.length > 0 || areaActual))
-        mostrarToast('No hay muestras con los filtros seleccionados', 'warning');
+    if (datosGlobales.length === 0 && puesto) mostrarToast('No hay muestras asignadas a esta persona', 'warning');
 }
-function limpiarFiltros() {
-    personasActuales = []; areaActual = '';
-    const areaEl = document.getElementById('areaSelect');
-    if (areaEl) areaEl.value = '';
-    document.querySelectorAll('.persona-cb').forEach(c=>{ c.checked=false; });
-    const cbAll = document.getElementById('persona-all');
-    if (cbAll) cbAll.checked = true;
-    filtrarGlobal();
-}
-function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ─── Navigation ─────────────────────────────────────────────────────────────
 function cambiarVista(vista) {
@@ -1039,8 +970,8 @@ function crearGrafico(canvasId, tipo, labels, data, colors) {
 
 function actualizarGraficos() {
     const titulo = document.getElementById('titulo-areaChart');
-    if (personasActuales.length > 0) {
-        if (titulo) titulo.textContent = 'Parametros — ' + (personasActuales.length===1 ? personasActuales[0] : personasActuales.length+' personas');
+    if (puestoTrabajoActual) {
+        if (titulo) titulo.textContent = 'Parametros — ' + puestoTrabajoActual;
         const pc={};
         datosGlobales.forEach(d=>{ const p=(d.Parametro||'Sin parametro').substring(0,50); pc[p]=(pc[p]||0)+1; });
         const sorted=Object.entries(pc).sort((a,b)=>b[1]-a[1]).slice(0,10);
@@ -1062,8 +993,8 @@ function actualizarGraficos() {
 
 function actualizarGraficasAvanzadas() {
     const titulo = document.getElementById('titulo-areaChart2');
-    if (personasActuales.length > 0) {
-        if (titulo) titulo.textContent = 'Parametros — ' + (personasActuales.length===1 ? personasActuales[0] : personasActuales.length+' personas');
+    if (puestoTrabajoActual) {
+        if (titulo) titulo.textContent = 'Parametros — ' + puestoTrabajoActual;
         const pc={};
         datosGlobales.forEach(d=>{ const p=(d.Parametro||'Sin parametro').substring(0,40); pc[p]=(pc[p]||0)+1; });
         crearGrafico('areaChart2','doughnut',Object.keys(pc),Object.values(pc),COLORS);
@@ -1166,7 +1097,7 @@ function actualizarKPIsAvanzados() {
 function actualizarMiDia() {
     const hoy = new Date(); hoy.setHours(0,0,0,0);
     const tomorrow = new Date(hoy); tomorrow.setDate(tomorrow.getDate()+1);
-    const persona = personasActuales.length===1 ? personasActuales[0] : personasActuales.length>1 ? personasActuales.join(', ') : 'Analista';
+    const persona = puestoTrabajoActual || 'Analista';
     document.getElementById('midia-fecha').textContent = hoy.toLocaleDateString('es-ES',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
     document.getElementById('midia-saludo').textContent = 'Hola, ' + persona + ' — aqui tienes tu dia';
 
@@ -1372,9 +1303,6 @@ function actualizarTablaPrincipal() {
             const em=document.getElementById('exportMenu');
             const ed=document.getElementById('exportDropdown');
             if(em && ed && !ed.contains(e.target)) em.classList.add('hidden');
-            const pm=document.getElementById('personalDropdownMenu');
-            const pw=document.getElementById('personalDropdownWrap');
-            if(pm && pw && !pw.contains(e.target)) pm.classList.add('hidden');
         });
         filtrosListenersAttached = true;
     }
@@ -1394,6 +1322,12 @@ function poblarFiltros() {
     setOpts('filterCliente',  clientes, 'Todos los clientes');
     setOpts('filterPersona',  personas, 'Todas las personas');
     setOpts('filterParametro',params,   'Todos los parametros');
+    const sel=document.getElementById('puestoTrabajoSelect');
+    if(sel) {
+        const actual=sel.value;
+        sel.innerHTML='<option value="">Todo el personal</option>'+personas.map(p=>`<option value="${p}">${p}</option>`).join('');
+        sel.value=actual;
+    }
 }
 
 // ─── Alertas Table ───────────────────────────────────────────────────────────
@@ -1619,7 +1553,7 @@ function exportarDatos(tipo) {
     const fecha=new Date().toISOString().split('T')[0];
     let datos, nombre;
     if(tipo==='todo')     { if(!datosOriginales.length){mostrarToast('Sin datos','warning');return;} datos=datosOriginales; nombre=`lab_completo_${fecha}.xlsx`; }
-    else if(tipo==='personal') { if(!datosGlobales.length){mostrarToast('Sin datos','warning');return;} datos=datosGlobales; nombre=`lab_${(personasActuales.length===1?personasActuales[0]:areaActual||'filtrado').replace(/\s+/g,'_')}_${fecha}.xlsx`; }
+    else if(tipo==='personal') { if(!datosGlobales.length){mostrarToast('Sin datos','warning');return;} datos=datosGlobales; nombre=`lab_${(puestoTrabajoActual||'todo').replace(/\s+/g,'_')}_${fecha}.xlsx`; }
     else if(tipo==='alertas')  { datos=datosGlobales.filter(d=>d.estadoVencimiento!=='ok'); if(!datos.length){mostrarToast('Sin alertas','warning');return;} nombre=`alertas_${fecha}.xlsx`; }
     else return;
     const exportData=datos.map(d=>({'Muestra':d.Muestra,'F. Recepcion':d['F. Recepcion']||d['F. Recepción'],'Cliente':d.Cliente,'Matriz':d.Matriz,'Parametro':d.Parametro,'Codigo':d.Codigo||d['Código'],'F.Limite':d['F.Limite']||d['F.Límite'],'Area':d.Area,'Metodo':d.Metodo||d['Método'],'Persona':d.Persona,'F. Caduc':d['F. Caduc'],'Conductivid':d.Conductivid,'Estado':d.Estado,'Firma':d.Firma,'FinAna':d.FinAna,'ceco':d.ceco,'Dias Espera':d.diasEspera,'Dias Plazo':d.diasPlazo,'Dias para Vencer':d.diasParaVencer,'% Plazo':d.pctPlazo,'Estado Vencimiento':estadoBadgeText(d.estadoVencimiento)}));
@@ -1662,7 +1596,7 @@ function cargarDesdeLocalStorage() {
         document.getElementById('dashboardContent').classList.remove('hidden');
         document.getElementById('lastUpdate').textContent=meta.fecha||'-';
         document.getElementById('btnNuevoArchivo').classList.remove('hidden');
-        poblarAreas(); poblarPuestosTrabajo();
+        poblarPuestosTrabajo();
         actualizarDashboard();
         mostrarToast('Sesion restaurada — '+datosOriginales.length+' muestras','info');
         return true;
@@ -1675,7 +1609,7 @@ function limpiarDatos() {
     datosGlobales=[]; datosOriginales=[];
     Object.values(charts).forEach(c=>{ try{c.destroy();}catch(_){} });
     charts={}; filtrosListenersAttached=false; tablaOrden={col:null,dir:'asc'};
-    personasActuales=[]; areaActual=''; quickFilterActivo=''; ribbonFilterActivo='';
+    puestoTrabajoActual=''; quickFilterActivo=''; ribbonFilterActivo='';
     document.getElementById('dashboardContent').classList.add('hidden');
     document.getElementById('uploadSection').classList.remove('hidden');
     document.getElementById('btnNuevoArchivo').classList.add('hidden');
