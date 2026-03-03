@@ -1753,10 +1753,10 @@ function mostrarToast(mensaje, tipo='info') {
 }
 
 // ─── localStorage ────────────────────────────────────────────────────────────
-function guardarEnLocalStorage(rawData) {
+function guardarEnLocalStorage(rawData, fechaArchivo) {
     try {
         localStorage.setItem(LS_RAW, JSON.stringify(rawData));
-        localStorage.setItem(LS_META, JSON.stringify({fecha:new Date().toLocaleString('es-ES'),total:rawData.length}));
+        localStorage.setItem(LS_META, JSON.stringify({fecha: fechaArchivo || new Date().toLocaleString('es-ES'), total: rawData.length}));
     } catch(e) { console.warn('localStorage no disponible:', e); }
 }
 function cargarDesdeLocalStorage() {
@@ -2024,7 +2024,7 @@ function _procesarArrayBuffer(arrayBuffer, nombre, fechaMod) {
     const rawData   = leerExcel(arrayBuffer);
     datosOriginales = procesarDatos(rawData);
     datosGlobales   = [...datosOriginales];
-    guardarEnLocalStorage(rawData);
+    guardarEnLocalStorage(rawData, fechaMod);
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('dashboardContent').classList.remove('hidden');
     document.getElementById('lastUpdate').textContent = fechaMod || new Date().toLocaleString('es-ES');

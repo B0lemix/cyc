@@ -6,29 +6,32 @@
 
 ## 1. Descripción del proyecto
 
-**Dashboard Lab v3** es una aplicación web autocontenida (un único archivo HTML de ~1600 líneas) para gestión de muestras de laboratorio. Lee archivos Excel, calcula métricas de plazos y caducidad, y presenta 8 vistas con gráficas, tablas, alertas y análisis de equipo.
+**Dashboard Lab v3** es una aplicación web autocontenida (un único archivo HTML de ~2100 líneas) para gestión de muestras de laboratorio. Lee archivos Excel, calcula métricas de plazos y caducidad, y presenta 9 vistas con gráficas, tablas, alertas, análisis de equipo y calendario de carga por fechas.
 
-- **Archivo principal:** `dashboard_v3.html`
+- **Archivo principal:** `dashboard_v3.3.html`
+- **Archivo de datos:** `V3.xls` (debe estar en el mismo directorio que el HTML)
 - **Sin backend:** toda la lógica corre en el navegador
 - **Sin build step:** HTML + CSS + JS en un solo archivo
 - **Dependencias (CDN):** Tailwind CSS (play), SheetJS 0.18.5, Chart.js 3.9.1
+- **Compatibilidad:** Chrome 86+ / Edge 86+ para carga automática de V3.xls (File System Access API). Firefox no soporta `showOpenFilePicker`.
 
 ---
 
 ## 2. Estructura del repositorio
 
 ```
-c:\...\CYC-WEB\v0\c\
-├── dashboard_v3.html     ← ARCHIVO PRINCIPAL (versión activa)
-├── dashboard_v2.html     ← Versión anterior (no tocar)
-├── dashboard.html        ← Versión original (no tocar)
+c:\OTROS\CYC_WEBAPP\cyc\
+├── dashboard_v3.3.html   ← ARCHIVO PRINCIPAL (versión activa)
+├── V3.xls                ← Datos de muestras (siempre en el mismo directorio)
+├── dashboard_v3.2.html   ← Versión anterior (no tocar)
+├── dashboard_v3.html     ← Versión anterior (no tocar)
 ├── cavedish.webp         ← Logo (referenciado en el HTML)
 ├── README.md             ← Documentación de usuario
 ├── AGENTS.md             ← Este archivo
 └── obsoleto\             ← Archivos archivados, ignorar
 ```
 
-**Regla:** Trabajar únicamente sobre `dashboard_v3.html`. Crear versiones nuevas si el cambio es estructural grande (e.g. `dashboard_v4.html`).
+**Regla:** Trabajar únicamente sobre `dashboard_v3.3.html`. Crear versiones nuevas si el cambio es estructural grande (e.g. `dashboard_v4.html`).
 
 ---
 
@@ -130,6 +133,7 @@ let alertTabActivo      = 'atab-plazo';
 let paginaActual        = 1;
 let tablaFiltradosCache = [];       // Resultado de filtros para paginación
 let filtrosListenersAttached = false;
+let calFechaMes         = new Date(); // Mes mostrado en vista-calendario (siempre día 1)
 ```
 
 ### Constantes de localStorage
@@ -140,17 +144,40 @@ const LS_META = 'labDashboard_v3_meta';   // Metadatos (fecha, total)
 // + 'lab_darkmode' para preferencia de tema
 ```
 
+### Persistencia en IndexedDB
+
+El handle del archivo V3.xls se guarda en IndexedDB (no localStorage, ya que `FileSystemFileHandle` no es serializable):
+
+```javascript
+// Base de datos: 'labDashboardFS_v1'  |  Object store: 'handles'
+// Clave usada: 'fileHandle'  →  FileSystemFileHandle de V3.xls
+```
+
 ### Flujo de datos
 
 ```
-Excel (.xlsx / .xls)
-    ↓  leerExcel(arrayBuffer)          ← SheetJS: header en fila 2
+V3.xls (desde FileSystemFileHandle o drag & drop)
+    ↓  recargarDesdeRuta() / handleFiles()
+    ↓  _procesarArrayBuffer(arrayBuffer, nombre, fechaMod)
+    ↓  leerExcel(arrayBuffer)              ← SheetJS: header en fila 2
     ↓  rawData (array de objetos)
-    ↓  procesarDatos(rawData)          ← añade campos calculados
+    ↓  procesarDatos(rawData)              ← añade campos calculados
     ↓  datosOriginales / datosGlobales
-    ↓  actualizarDashboard()           ← renderiza KPIs + gráficas + filtros
-    ↓  renderVista(vistaActual)        ← renderiza la vista activa
+    ↓  guardarEnLocalStorage(rawData, fechaMod)  ← persiste en localStorage
+    ↓  actualizarDashboard()               ← renderiza KPIs + gráficas + filtros
+    ↓  renderVista(vistaActual)            ← renderiza la vista activa
 ```
+
+### Secuencia de inicialización
+
+```javascript
+// Al final del <script>:
+initDarkMode();
+cargarDesdeLocalStorage();   // muestra datos cacheados inmediatamente
+_intentarAutoCargar();       // refresca desde el archivo real (asíncrono)
+```
+
+`_intentarAutoCargar()` NO muestra diálogo al usuario: si hay permiso previo, carga silenciosamente; si no, muestra un indicator de "Autorizar" en la zona de carga.
 
 ### Función de lectura de Excel — detalles críticos
 
@@ -182,20 +209,44 @@ function leerExcel(arrayBuffer) {
 
 ### Registro de vistas
 
-Las vistas están registradas en el objeto `titles` dentro de `cambiarVista()`:
+Las vistas están registradas en `cambiarVista()`:
 
 ```javascript
+const vistas = ['general','miidia','kpi','graficas','tablas','analisis','alertas','equipo','calendario'];
+
 const titles = {
-    general:  ['Vision General',    '...'],
-    miidia:   ['Mi Dia',            '...'],
-    kpi:      ['Indicadores KPI',   '...'],
-    graficas: ['Graficas',          '...'],
-    tablas:   ['Tablas Detalladas', '...'],
-    analisis: ['Analisis Avanzado', '...'],
-    alertas:  ['Alertas',          '...'],
-    equipo:   ['Gestion de Equipo', '...']
+    general:   ['Vision General',    '...'],
+    miidia:    ['Mi Dia',            '...'],
+    kpi:       ['Indicadores KPI',   '...'],
+    graficas:  ['Graficas',          '...'],
+    tablas:    ['Tablas Detalladas', '...'],
+    analisis:  ['Analisis Avanzado', '...'],
+    alertas:   ['Alertas',           '...'],
+    equipo:    ['Gestion de Equipo', '...'],
+    calendario:['Carga por Fechas',  'Distribucion semanal y mensual de muestras pendientes']
 };
 ```
+
+### Vista-calendario — funciones JS
+
+| Función | Descripción |
+|---|---|
+| `calNavMes(dir)` | Navega: `dir=-1` mes anterior, `dir=0` hoy, `dir=1` mes siguiente |
+| `actualizarCalendario()` | Construye `recMap` (dict `'YYYY-MM-DD' → [índices]`) y llama a `renderCalMes` + `renderCalGraficaSemana` |
+| `renderCalMes(recMap)` | Renderiza la cuadrícula mensual con heatmap de 5 niveles de verde |
+| `calVerDia(key)` | Al hacer click en un día: muestra tabla de muestras + chart horizontal de parámetros |
+| `renderCalGraficaSemana(recMap)` | Gráfica de barras agrupada por día de la semana (histórico del mes mostrado) |
+
+**Heatmap de color:**
+- `recMap[key].length === 0` → `hsl(var(--muted))` (fondo gris)
+- `> 0` hasta máximo mensual: 4 intensidades de verde (`hsla(142,76%,36%,.2)` a `hsl(142,76%,28%)`)
+- Día actual: outline con `hsl(var(--primary))`
+
+**Chart de parámetros por día (`calDiaChart`):**
+- Tipo `bar` con `indexAxis: 'y'` (horizontal)
+- Top 12 parámetros por frecuencia
+- Alto dinámico: `Math.max(120, paramLabels.length * 28) + 'px'`
+- Se destruye al cerrar el panel del día
 
 ### Añadir una nueva vista
 
@@ -206,19 +257,93 @@ const titles = {
 5. Añadir case en `renderVista()` llamando a la función de render
 6. Implementar `actualizarNOMBRE()` con la lógica de la vista
 
-### Añadir una nueva columna visible en la tabla principal
+---
 
-La tabla principal (`Tablas`) tiene un sistema de toggle de columnas:
+## 7. Carga automática de V3.xls (File System Access API)
 
-1. Añadir `<input type="checkbox" id="col-NUEVA" ...>` en `#colToggleMenu`
-2. En `aplicarFiltrosTabla()`, añadir `const showNUEVA = getColVisible('col-NUEVA')`
-3. Añadir `<th data-col-toggle="col-NUEVA">` en el `<thead>`
-4. Añadir celda `<td data-col-toggle="col-NUEVA">` en el template de fila
-5. Añadir `'col-NUEVA'` al array `toggleCols` en `actualizarTablaPrincipal()`
+### Flujo de carga
+
+```
+Apertura del HTML
+    ↓
+cargarDesdeLocalStorage()     ← muestra datos cacheados si existen
+    ↓
+_intentarAutoCargar()
+    ├── Si protocol !== 'file://' → intenta fetch('./V3.xls') y './V3.xlsx'
+    │       ↓ éxito → _procesarArrayBuffer(buf, nombre, Last-Modified header)
+    │
+    └── Si protocol === 'file://' → lee FileSystemFileHandle de IndexedDB
+            ├── perm === 'granted'  → recargarDesdeRuta()  (silencioso)
+            └── perm !== 'granted'  → muestra estado "Autorizar carga"
+```
+
+### Funciones de FS API + IndexedDB
+
+```javascript
+_abrirIDB()                         // abre DB 'labDashboardFS_v1', store 'handles'
+_idbSet(k, v)                       // guarda handle
+_idbGet(k)                          // recupera handle
+_idbDel(k)                          // borra handle
+
+seleccionarArchivoV3()              // abre showOpenFilePicker, guarda handle en IDB
+recargarDesdeRuta()                 // recarga V3.xls (fetch o fileHandle)
+desvincularArchivo()                // borra handle de IDB, resetea UI
+_intentarAutoCargar()               // init: carga silenciosa si hay permiso
+_mostrarFsStatusOk(nombre, fecha)   // UI: "Vinculado: V3.xls — 01/03/2026"
+_mostrarFsStatusPendiente(nombre)   // UI: "Autorizar carga de V3.xls"
+```
+
+### Regla CORS con file:// protocol
+
+```javascript
+// ❌ fetch() desde file:// lanza CORS error
+fetch('./V3.xls')   // → "blocked by CORS policy" desde origin 'null'
+
+// ✅ SIEMPRE guardar con este guard
+if (location.protocol !== 'file:') {
+    // intentar fetch
+}
+// Si no, usar FileSystemFileHandle desde IndexedDB
+```
+
+### `_procesarArrayBuffer` — función central de carga
+
+```javascript
+function _procesarArrayBuffer(arrayBuffer, nombre, fechaMod) {
+    const rawData = leerExcel(arrayBuffer);
+    datosOriginales = procesarDatos(rawData);
+    datosGlobales = [...datosOriginales];
+    guardarEnLocalStorage(rawData, fechaMod);   // ← fechaMod = fecha real del archivo
+    // actualiza UI, pobla filtros, renderiza dashboard
+    mostrarToast(datosOriginales.length + ' muestras cargadas — ' + nombre, 'success');
+}
+```
+
+### `guardarEnLocalStorage` — firma actualizada
+
+```javascript
+// FIRMA ACTUAL (v3.3)
+function guardarEnLocalStorage(rawData, fechaArchivo) {
+    localStorage.setItem(LS_RAW, JSON.stringify(rawData));
+    localStorage.setItem(LS_META, JSON.stringify({
+        fecha: fechaArchivo || new Date().toLocaleString('es-ES'),
+        total: rawData.length
+    }));
+}
+// ⚠️ fechaArchivo debe ser la fecha de MODIFICACIÓN del archivo V3.xls,
+//    no la fecha actual. Se usa en "Ultima act." del header.
+```
+
+**Orígenes de `fechaMod` según la ruta de carga:**
+| Ruta | Fuente de fecha |
+|---|---|
+| Fetch HTTP | `resp.headers.get('Last-Modified')` parseado con `new Date()` |
+| FileSystemFileHandle | `file.lastModified` (timestamp) |
+| Drag & drop manual | `file.lastModified` (timestamp) |
 
 ---
 
-## 7. Parser de fechas — `parseFecha()`
+## 8. Parser de fechas — `parseFecha()`
 
 Función crítica. Siempre usarla para parsear cualquier columna de fecha.
 
@@ -251,7 +376,7 @@ function parseFecha(val) {
 
 ---
 
-## 8. Sistema de gráficas (Chart.js)
+## 9. Sistema de gráficas (Chart.js)
 
 ### Regla crítica: siempre destruir antes de recrear
 
@@ -293,7 +418,7 @@ const COLORS = [
 
 ---
 
-## 9. Sistema de color / diseño
+## 10. Sistema de color / diseño
 
 ### Variables CSS (tema)
 
@@ -334,7 +459,7 @@ const color = pct > 100 ? '#ef4444' : pct > 75 ? '#f97316' : pct > 50 ? '#eab308
 
 ---
 
-## 10. Modal de detalle
+## 11. Modal de detalle
 
 El modal es un elemento DOM único (`#detailModal`) que se rellena dinámicamente.
 
@@ -364,7 +489,7 @@ function abrirModal(idx) {
 
 ---
 
-## 11. Toast / notificaciones
+## 12. Toast / notificaciones
 
 ```javascript
 mostrarToast(mensaje, tipo);
@@ -374,11 +499,12 @@ mostrarToast(mensaje, tipo);
 
 ---
 
-## 12. Reglas de codificación
+## 13. Reglas de codificación
 
 ### Convenciones
 
 - **Funciones en camelCase:** `actualizarKPIs`, `aplicarFiltrosTabla`, `parseFecha`
+- **Funciones internas/privadas con prefijo `_`:** `_abrirIDB`, `_idbGet`, `_procesarArrayBuffer`
 - **IDs de elementos en camelCase o kebab:** `tablaPrincipal`, `alertBadge`, `col-progreso`
 - **Variables de estado globales** declaradas al inicio del `<script>` con `let`
 - **Constantes** con `const` en mayúsculas: `LS_RAW`, `LS_META`
@@ -424,7 +550,7 @@ function actualizarGraficaXxx() {
 
 ---
 
-## 13. Casos de prueba mínimos a verificar
+## 14. Casos de prueba mínimos a verificar
 
 Antes de entregar cualquier cambio, verificar manualmente:
 
@@ -439,10 +565,19 @@ Antes de entregar cualquier cambio, verificar manualmente:
 - [ ] Sidebar se colapsa y expande correctamente
 - [ ] Exportar genera un XLSX descargable
 - [ ] `localStorage` persiste y restaura sesión al recargar el navegador
+- [ ] **[v3.3]** Botón "Autorizar carga de V3.xls" abre el file picker en Chrome/Edge
+- [ ] **[v3.3]** Tras autorizar, recargar la página carga V3.xls automáticamente (sin diálogo)
+- [ ] **[v3.3]** "Ultima act." muestra la fecha de modificación del archivo V3.xls, no la hora de recarga
+- [ ] **[v3.3]** Botón "Recargar V3.xls" en el header recarga el archivo sin recargar la página
+- [ ] **[v3.3]** Sin errores CORS en consola al abrir el HTML por doble-click (file://)
+- [ ] **[v3.3]** Vista "Carga por Fechas" muestra el calendario mensual con heatmap de colores
+- [ ] **[v3.3]** Click en día del calendario muestra tabla + gráfica de parámetros
+- [ ] **[v3.3]** Navegación mensual (← / Hoy / →) actualiza el calendario correctamente
+- [ ] **[v3.3]** Cerrar panel de día destruye `calDiaChart` sin errores de canvas
 
 ---
 
-## 14. Anti-patrones — qué NO hacer
+## 15. Anti-patrones — qué NO hacer
 
 ```javascript
 // ❌ No usar new Date() directamente sobre valores de Excel
@@ -479,11 +614,24 @@ d['F.Recepción']  // falta espacio
 d['F.Límite']
 d['Método']
 d['F. Recepción']
+
+// ❌ No usar fetch() sobre archivos locales sin el guard de protocolo
+fetch('./V3.xls')   // CORS error si protocol === 'file:'
+
+// ✅ Siempre guard
+if (location.protocol !== 'file:') { /* fetch */ }
+// Para file://, usar FileSystemFileHandle desde IndexedDB
+
+// ❌ No guardar FileSystemFileHandle en localStorage (no serializable)
+localStorage.setItem('handle', fileHandle)  // → falla silenciosamente
+
+// ✅ Usar IndexedDB (structured-cloneable)
+await _idbSet('fileHandle', fileHandle)
 ```
 
 ---
 
-## 15. Extensiones frecuentes y cómo implementarlas
+## 16. Extensiones frecuentes y cómo implementarlas
 
 ### A. Añadir un nuevo KPI card en Vista General
 
@@ -515,19 +663,28 @@ campoModal('Etiqueta', d.campoNuevo || '-')
 // La función campoModal() genera el HTML de un campo del grid
 ```
 
+### E. Añadir un nuevo mes/periodo al calendario
+
+El calendario usa `calFechaMes` (variable global de estado). Para añadir una vista de período personalizado:
+1. Calcular el rango de fechas deseado
+2. Filtrar `datosGlobales` por `parseFecha(d['F. Recepción'])` dentro del rango
+3. Construir `recMap` como `{ 'YYYY-MM-DD': [índices] }` y llamar a `renderCalMes(recMap)`
+
 ---
 
-## 16. Rendimiento y límites
+## 17. Rendimiento y límites
 
 | Límite | Valor aproximado | Nota |
 |---|---|---|
 | Filas de Excel procesables | ~5.000–10.000 | Depende del navegador y RAM |
 | localStorage disponible | ~5 MB | Error capturado con try/catch |
+| IndexedDB para FileHandle | Sin límite práctico | Solo guarda el handle, no datos |
 | Puntos en scatter chart | Limitado a 200 | Ver `sample = datosGlobales.slice(0, 200)` |
 | Filas por página en tabla | 50 | Constante `ROWS_PER_PAGE` |
 | Mini-tablas en Mi Día | 20 por sección | Ver `.slice(0, 20)` |
 | Analistas en chart de equipo | Top 10 | Ver `.slice(0, 10)` |
+| Parámetros en chart de día | Top 12 | Ver `.slice(0, 12)` en `calVerDia()` |
 
 ---
 
-*AGENTS.md — Dashboard Lab v3 · Actualizado: 2026-02*
+*AGENTS.md — Dashboard Lab v3.3 · Actualizado: 2026-03*

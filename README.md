@@ -1,7 +1,7 @@
 # Dashboard Lab v3 — Gestión de Muestras
 
 > Sistema de monitorización de muestras de laboratorio basado en Excel.
-> Aplicación web autocontenida — sin servidor, sin instalación, funciona en cualquier navegador moderno.
+> Aplicación web autocontenida — sin servidor, sin instalación, funciona en cualquier navegador moderno (Chrome / Edge recomendados).
 
 ---
 
@@ -48,14 +48,33 @@
 
 ## 2. Primeros pasos
 
-1. Abrir `dashboard_v3.html` en un navegador moderno (Chrome, Edge, Firefox).
-2. Arrastrar el archivo Excel a la zona de carga **o** hacer clic en **"Seleccionar archivo"**.
-3. El dashboard carga automáticamente y muestra la **Visión General**.
-4. Usar el selector **"Filtrar por Personal"** en la barra lateral para ver la carga de un analista concreto.
+El archivo **`V3.xls`** debe estar siempre en la **misma carpeta** que `dashboard_v3.3.html`.
 
-> **Nota:** La próxima vez que se abra el archivo, los datos de la última sesión se restauran automáticamente desde `localStorage`.
+### Primera vez
 
-Para cargar un archivo nuevo, hacer clic en **"Cargar nuevo"** (botón en la cabecera superior).
+1. Abrir `dashboard_v3.3.html` en Chrome o Edge (doble clic).
+2. Hacer clic en **"Autorizar carga de V3.xls"** — aparece el selector de archivos del sistema operativo.
+3. Navegar hasta la carpeta y seleccionar `V3.xls`.
+4. El dashboard carga y muestra la **Visión General**. El permiso queda guardado.
+
+### A partir de la segunda vez
+
+Al abrir el dashboard, **`V3.xls` se carga automáticamente** sin intervención del usuario.
+
+- Si el permiso sigue activo (mismo navegador): carga silenciosa.
+- Si el permiso caducó: aparece el aviso en la tarjeta y el botón **"Recargar ahora"**.
+
+### Botón "Recargar V3.xls" (cabecera)
+
+Visible siempre que hay un archivo vinculado. Permite refrescar los datos en cualquier momento sin salir del dashboard.
+
+### Carga manual (alternativa)
+
+Arrastra el archivo Excel a la zona de carga inferior, o usa **"Seleccionar archivo"**. Funciona también en Firefox.
+
+> **"Ultima act."** en la cabecera muestra siempre la **fecha de modificación del archivo V3.xls** utilizado, no la hora de apertura. Útil para saber qué versión de datos está cargada.
+
+Para cargar un archivo diferente: botón **"Cargar nuevo"** (visible tras cargar datos).
 
 ---
 
@@ -296,6 +315,27 @@ Todas las filas son clicables → abre el modal de detalle.
 
 ---
 
+### 5.9 Carga por Fechas 📅 *(nuevo)*
+
+Vista de calendario visual para identificar qué días tienen mayor entrada de trabajo, basada en la fecha de **recepción** de muestras (`F. Recepción`).
+
+#### Calendario mensual
+
+- Cuadrícula 7×N con todos los días del mes actual.
+- Cada celda muestra el **número de muestras recibidas** ese día.
+- **Intensidad de color verde** proporcional a la carga del día (escala de 5 niveles).
+- El día actual se resalta con contorno azul.
+- Flechas `<` `>` para navegar entre meses. Botón **"Hoy"** para volver al mes actual.
+- **Click en un día** → abre un panel inferior con:
+  - **Gráfico de barras horizontales** con el número de muestras por Parámetro ese día (top 12).
+  - **Tabla** con las muestras recibidas: Muestra · Cliente · Área · Persona · Estado. Cada fila abre el modal de detalle.
+
+#### Gráfico histórico por día de semana
+
+Barra chart (Lunes a Domingo) con el total acumulado histórico de recepciones por día de la semana. Identifica si hay un día sistemáticamente más cargado.
+
+---
+
 ### Modal de detalle
 
 Click en cualquier fila de cualquier tabla abre un modal con toda la información de la muestra organizada en 5 secciones:
@@ -371,17 +411,29 @@ Nombre del archivo generado: `lab_completo_AAAA-MM-DD.xlsx` / `lab_PERSONA_AAAA-
 
 ## 9. Persistencia de sesión
 
-Los datos del Excel se guardan en `localStorage` del navegador al cargar un archivo. Al abrir el dashboard de nuevo, la sesión anterior se restaura automáticamente (con un toast informativo).
+### localStorage (datos del dashboard)
+
+Los datos del Excel se guardan en `localStorage` al cargar un archivo. Al abrir el dashboard, la sesión anterior se restaura como caché mientras se recarga el archivo real.
 
 | Clave localStorage | Contenido |
 |---|---|
 | `labDashboard_v3_raw` | JSON con los datos crudos del Excel |
-| `labDashboard_v3_meta` | Fecha de última carga y total de registros |
-| `lab_darkmode` | Preferencia de modo oscuro (`"dark"` o `""`) |
+| `labDashboard_v3_meta` | Fecha de modificación del archivo y total de registros |
+| `lab_darkmode` | Preferencia de modo oscuro (`"1"` o `"0"`) |
 
-> **Límite:** `localStorage` soporta ~5 MB. Para archivos Excel muy grandes (miles de filas con muchas columnas), puede alcanzarse el límite. El sistema captura el error y avisa.
+> **Límite:** `localStorage` soporta ~5 MB. Para archivos Excel muy grandes puede alcanzarse el límite. El sistema captura el error y avisa.
 
-Para borrar la sesión y cargar un archivo nuevo: botón **"Cargar nuevo"** (visible tras cargar datos).
+### IndexedDB (handle del archivo V3.xls)
+
+El permiso de acceso al archivo `V3.xls` se guarda en IndexedDB del navegador:
+
+| Base de datos | Store | Clave | Contenido |
+|---|---|---|---|
+| `labDashboardFS_v1` | `handles` | `fileHandle` | `FileSystemFileHandle` de V3.xls |
+
+> El handle persiste entre sesiones. Chrome/Edge mantienen el permiso activo mientras el origen (la ruta del HTML) no cambie. Si el permiso caduca, el dashboard muestra un aviso y el botón "Recargar ahora" para reautorizarlo con un clic.
+
+Para desvincular el archivo: botón **"Desvincular"** en la tarjeta de la pantalla de carga.
 
 ---
 
@@ -393,14 +445,19 @@ Verificar que las cabeceras estén exactamente en la **fila 2** del Excel, con l
 **¿Las fechas aparecen como números raros?**
 Asegurarse de que las celdas de fecha en Excel tengan formato de fecha (no texto). El parser admite varios formatos pero las celdas con formato de texto pueden no reconocerse.
 
+**¿El botón "Autorizar carga de V3.xls" no aparece o no funciona?**
+La función `showOpenFilePicker` requiere Chrome 86+ o Edge 86+. En Firefox, usar el drag & drop o el selector manual.
+
 **¿Puedo usar el dashboard sin conexión a internet?**
 Las librerías (Tailwind, SheetJS, Chart.js) se cargan desde CDN. Sin conexión no funcionará. Para uso offline, descargar las librerías localmente y actualizar los `<script src>`.
 
 **¿Los datos se envían a algún servidor?**
-No. Todo el procesamiento es local en el navegador. Los datos solo se guardan en `localStorage` del navegador del usuario.
+No. Todo el procesamiento es local en el navegador. Los datos solo se guardan en `localStorage` e `IndexedDB` del navegador del usuario.
 
 **¿Qué navegadores son compatibles?**
-Chrome 90+, Edge 90+, Firefox 88+, Safari 15+. No compatible con Internet Explorer.
+- Carga automática de V3.xls: Chrome 86+, Edge 86+.
+- Funcionalidad completa (sin auto-carga): Chrome 90+, Edge 90+, Firefox 88+, Safari 15+.
+- No compatible con Internet Explorer.
 
 **¿Puedo añadir más columnas al Excel?**
 Sí. Las columnas extra se leen y se muestran en el modal de detalle como parte del objeto de datos, aunque no aparecerán en las tablas principales (que muestran columnas fijas).
@@ -412,14 +469,16 @@ Sí. Las columnas extra se leen y se muestran en el modal de detalle como parte 
 ### Archivos del proyecto
 
 ```
-c:\...\CYC-WEB\v0\c\
-├── dashboard_v3.html   ← Aplicación principal (versión actual)
-├── dashboard_v2.html   ← Versión anterior (referencia)
-├── dashboard.html      ← Versión original (referencia)
-├── cavedish.webp       ← Logo de la aplicación
-├── README.md           ← Esta documentación
-├── AGENTS.md           ← Guía para agentes de IA
-└── obsoleto\           ← Versiones anteriores archivadas
+c:\OTROS\CYC_WEBAPP\cyc\
+├── dashboard_v3.3.html  ← Aplicación principal (versión activa)
+├── dashboard_v3.2.html  ← Versión anterior (referencia)
+├── dashboard_v3.1.html  ← Versión anterior (referencia)
+├── dashboard_v3.0.html  ← Versión anterior (referencia)
+├── V3.xls              ← Datos del laboratorio (mismo directorio, siempre actualizado)
+├── cavedish.webp        ← Logo de la aplicación
+├── README.md            ← Esta documentación
+├── AGENTS.md            ← Guía para agentes de IA
+└── obsoleto\            ← Versiones anteriores archivadas
 ```
 
 ### Resumen de vistas y funciones JS asociadas
@@ -434,6 +493,7 @@ c:\...\CYC-WEB\v0\c\
 | Análisis | `vista-analisis` | `actualizarAnalisisAvanzado()` |
 | Alertas | `vista-alertas` | `actualizarTablaAlertas()` |
 | Equipo | `vista-equipo` | `actualizarCargaTrabajo()` + `actualizarGraficoEquipo()` + `actualizarHeatmap()` |
+| Carga por Fechas | `vista-calendario` | `actualizarCalendario()` |
 
 ### Paleta de colores del sistema
 
@@ -448,4 +508,4 @@ c:\...\CYC-WEB\v0\c\
 
 ---
 
-*Dashboard Lab v3 — Cavendish / CYC · Última revisión: 2026-02*
+*Dashboard Lab v3.3 — Cavendish / CYC · Última revisión: 2026-03*
