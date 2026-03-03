@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="es" class="">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Lab v3 - Gestion de Muestras</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script>
+tailwind.config={darkMode:"class",theme:{extend:{colors:{
+  border:"hsl(var(--border))",input:"hsl(var(--input))",background:"hsl(var(--background))",
+  foreground:"hsl(var(--foreground))",card:"hsl(var(--card))",
+  muted:{DEFAULT:"hsl(var(--muted))",foreground:"hsl(var(--muted-foreground))"},
+  primary:{DEFAULT:"hsl(var(--primary))",foreground:"hsl(var(--primary-foreground))"},
+  secondary:{DEFAULT:"hsl(var(--secondary))",foreground:"hsl(var(--secondary-foreground))"},
+  destructive:{DEFAULT:"hsl(var(--destructive))",foreground:"hsl(var(--destructive-foreground))"},
+  accent:"hsl(var(--accent))"
+}}}};
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+*{font-family:"Inter",sans-serif;}
+:root{
+  --border:214.3 31.8% 91.4%;--input:214.3 31.8% 91.4%;
+  --background:0 0% 100%;--foreground:222.2 84% 4.9%;
+  --card:0 0% 100%;--muted:210 40% 96.1%;--muted-foreground:215.4 16.3% 46.9%;
+  --primary:222.2 47.4% 11.2%;--primary-foreground:210 40% 98%;
+  --secondary:210 40% 96.1%;--secondary-foreground:222.2 47.4% 11.2%;
+  --destructive:0 84.2% 60.2%;--destructive-foreground:210 40% 98%;
+  --accent:210 40% 96.1%;
+}
+html.dark{
+  --border:220 14% 22%;--input:220 14% 22%;
+  --background:220 14% 10%;--foreground:210 40% 93%;
+  --card:220 14% 14%;--muted:220 14% 19%;--muted-foreground:215 20% 58%;
+  --primary:210 70% 72%;--primary-foreground:220 14% 10%;
+  --secondary:220 14% 19%;--secondary-foreground:210 40% 90%;
+  --destructive:0 70% 58%;--destructive-foreground:210 40% 98%;
+  --accent:220 14% 19%;
+}
+body{background-color:hsl(var(--background));color:hsl(var(--foreground));}
+#sidebar{width:256px;transition:width 0.25s ease;flex-shrink:0;}
+#sidebar.collapsed{width:64px;}
+#sidebar.collapsed .sb-text,#sidebar.collapsed .user-section{display:none!important;}
+#sidebar.collapsed nav button{justify-content:center;padding-left:0;padding-right:0;}
+#sidebar.collapsed .logo-wrap{justify-content:center;}
+.sidebar-active{background-color:hsl(var(--muted));border-left:3px solid hsl(var(--primary));}
+#toastContainer{position:fixed;bottom:1.5rem;right:1.5rem;display:flex;flex-direction:column;gap:.5rem;z-index:9999;pointer-events:none;}
+.toast{pointer-events:auto;transform:translateX(120%);opacity:0;transition:transform .28s ease,opacity .28s ease;max-width:340px;}
+.toast.show{transform:translateX(0);opacity:1;}.toast.hide{transform:translateX(120%);opacity:0;}
+.chart-container{position:relative;height:300px;}
+.drag-over{border-color:hsl(var(--primary))!important;background-color:hsl(var(--muted))!important;}
+#detailModal{display:none;position:fixed;inset:0;z-index:10000;overflow-y:auto;align-items:flex-start;justify-content:center;padding:2rem 1rem;}
+#detailModal.open{display:flex;}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);}
+.modal-box{position:relative;z-index:1;width:100%;max-width:780px;background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:.75rem;padding:2rem;box-shadow:0 25px 50px rgba(0,0,0,.3);}
+#statsRibbon{display:none;}
+#statsRibbon.visible{display:flex;}
+.chip{cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:9999px;font-size:.75rem;font-weight:500;border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));transition:all .15s;}
+.chip:hover{background:hsl(var(--muted));}
+.chip.active{background:hsl(var(--primary));color:hsl(var(--primary-foreground));border-color:hsl(var(--primary));}
+.progress-wrap{width:68px;height:6px;border-radius:3px;background:hsl(var(--muted));overflow:hidden;display:inline-block;vertical-align:middle;}
+.progress-fill{height:100%;border-radius:3px;transition:width .3s;}
+th[data-col]{user-select:none;cursor:pointer;}
+th[data-col]:hover{color:hsl(var(--primary));}
+.alert-tab{cursor:pointer;padding:8px 14px;font-size:.8rem;font-weight:500;border-bottom:2px solid transparent;color:hsl(var(--muted-foreground));white-space:nowrap;transition:all .15s;}
+.alert-tab.active{border-bottom-color:hsl(var(--primary));color:hsl(var(--foreground));}
+#colToggleMenu{display:none;position:absolute;right:0;top:calc(100% + 4px);background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:.5rem;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:200;min-width:200px;padding:8px 0;}
+#colToggleMenu.open{display:block;}
+html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));color:hsl(var(--foreground));border-color:hsl(var(--border));}
+.hm-cell{display:inline-flex;align-items:center;justify-content:center;min-width:68px;height:34px;border-radius:6px;font-size:.7rem;font-weight:600;padding:0 8px;}
+::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:hsl(var(--border));border-radius:9999px;}
+@media print{aside,#statsRibbon,.no-print,#detailModal{display:none!important;}}
+</style>
+</head>
+<body class="antialiased">
+<div class="flex h-screen overflow-hidden">
+<aside id="sidebar" class="flex flex-col overflow-hidden border-r" style="border-color:hsl(var(--border));background:hsl(var(--card))">
+  <div class="logo-wrap flex items-center gap-3 px-4 py-4 border-b" style="border-color:hsl(var(--border))">
+    <a href="" class="sb-text block hover:scale-110 transition"><img src="cavedish.webp" alt="" style="height:30px"></a>
+    <p class="sb-text text-xs" style="color:hsl(var(--muted-foreground))">Gestion del Laboratorio</p>
+  </div>
+  <nav class="flex-1 overflow-y-auto p-3 space-y-0.5">
+    <button onclick="cambiarVista('general')" id="nav-general" class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-muted transition-colors sidebar-active">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      <span class="sb-text">Vision General</span>
+    </button>
+    <button onclick="cambiarVista('miidia')" id="nav-miidia" class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-muted transition-colors">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+      <span class="sb-text">Mi Dia</span>
+    </button>
+    <button onclick="cambiarVista('kpi')" id="nav-kpi" class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-muted transition-colors">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      <span class="sb-text">Indicadores KPI</span>
+    </button>
+    <button onclick="cambiarVista('graficas')" id="nav-graficas" class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-muted transition-colors">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/></svg>
+      <span class="sb-text">Graficas</span>
+    </button>
+    <button onclick="cambiarVista('tablas')" id="nav-tablas" class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-muted transition-colors">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+      <span class="sb-text">Tablas Detalladas</span>
+    </button>
+    <button onclick="cambiarVista('analisis')" id="nav-analisis" class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-muted transition-colors">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      <span class="sb-text">Analisis Avanzado</span>
+    </button>
+    <button onclick="cambiarVista('alertas')" id="nav-alertas" class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-muted transition-colors">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+      <span class="sb-text">Alertas</span><span id="alertBadge" class="sb-text ml-auto text-xs font-semibold px-2 py-0.5 rounded-full" style="background:hsl(var(--destructive));color:hsl(var(--destructive-foreground))">0</span>
+    </button>
+    <button onclick="cambiarVista('equipo')" id="nav-equipo" class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-muted transition-colors">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <span class="sb-text">Gestion de Equipo</span>
+    </button>
+  </nav>
+  <div class="user-section p-4 border-t" style="border-color:hsl(var(--border))">
+    <div class="flex items-center gap-2 mb-3">
+      <div id="avatar" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style="background:hsl(var(--primary));color:hsl(var(--primary-foreground))">?</div>
+      <p id="analista" class="text-xs font-medium truncate">Sin seleccion</p>
+    </div>
+    <label class="block text-xs font-medium mb-1" style="color:hsl(var(--muted-foreground))">Filtrar por Area</label>
+    <select id="areaSelect" onchange="filtrarGlobal()" class="w-full px-2 py-1.5 text-xs border rounded-md focus:outline-none mb-3" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
+      <option value="">Todas las areas</option>
+    </select>
+    <label class="block text-xs font-medium mb-1" style="color:hsl(var(--muted-foreground))">Filtrar por Personal</label>
+    <div class="relative" id="personalDropdownWrap">
+      <button type="button" onclick="togglePersonalDropdown()" id="personalDropdownBtn" class="w-full text-left px-2 py-1.5 text-xs border rounded-md focus:outline-none flex items-center justify-between gap-1" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
+        <span id="personalDropdownLabel" class="truncate">Todo el personal</span>
+        <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div id="personalDropdownMenu" class="hidden absolute bottom-full left-0 right-0 mb-1 border rounded-md shadow-lg max-h-52 overflow-y-auto z-50" style="background:hsl(var(--card));border-color:hsl(var(--border))"></div>
+    </div>
+    <button onclick="limpiarFiltros()" class="mt-2 w-full text-xs px-2 py-1 rounded border hover:bg-muted transition-colors" style="border-color:hsl(var(--border));color:hsl(var(--muted-foreground))">Limpiar filtros</button>
+  </div>
+</aside>
+<main class="flex-1 overflow-hidden flex flex-col min-w-0">
+<header class="no-print border-b px-4 py-3 flex-shrink-0 z-20" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+  <div class="flex items-center gap-2">
+    <button onclick="toggleSidebar()" class="no-print p-2 rounded-md hover:bg-muted transition-colors" title="Toggle sidebar">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <div class="flex-1 min-w-0">
+      <h1 id="pageTitle" class="text-lg font-semibold truncate">Vision General</h1>
+      <p id="pageSubtitle" class="text-xs truncate" style="color:hsl(var(--muted-foreground))">Resumen de todas las muestras del laboratorio</p>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0 no-print">
+      <div class="relative" id="exportDropdown">
+        <button onclick="toggleExportMenu()" class="inline-flex items-center gap-1.5 rounded-md text-xs font-medium px-3 h-8 border hover:bg-muted transition-colors" style="border-color:hsl(var(--border));background:hsl(var(--background))">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Exportar
+        </button>
+        <div id="exportMenu" class="hidden absolute right-0 mt-1 rounded-md border shadow-lg z-50" style="min-width:190px;background:hsl(var(--card));border-color:hsl(var(--border))">
+          <button onclick="exportarDatos('todo')" class="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors">Exportar todo</button>
+          <button onclick="exportarDatos('personal')" class="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors">Personal seleccionado</button>
+          <button onclick="exportarDatos('alertas')" class="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors" style="color:hsl(var(--destructive))">Vencidas + Urgentes</button>
+        </div>
+      </div>
+      <button id="btnNuevoArchivo" onclick="limpiarDatos()" class="hidden inline-flex items-center gap-1.5 rounded-md text-xs font-medium px-3 h-8 border hover:bg-muted" style="border-color:hsl(var(--border));background:hsl(var(--background))">Cargar nuevo</button>
+      <div class="text-right hidden sm:block"><p class="text-xs" style="color:hsl(var(--muted-foreground))">Ultima act.</p><p class="text-xs font-medium" id="lastUpdate">-</p></div>
+      <button onclick="window.print()" class="p-2 rounded-md hover:bg-muted" title="Imprimir" style="color:hsl(var(--muted-foreground))">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+      </button>
+      <button onclick="toggleDarkMode()" class="p-2 rounded-md hover:bg-muted" title="Modo oscuro" style="color:hsl(var(--muted-foreground))">
+        <svg id="iconMoon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+        <svg id="iconSun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+<div id="statsRibbon" class="no-print gap-2 px-4 py-2 border-b flex-wrap flex-shrink-0" style="border-color:hsl(var(--border));background:hsl(var(--card))">
+  <button onclick="ribbonFilter('all')" id="rb-all" class="chip active">Total: <strong id="rb-n-all">0</strong></button>
+  <button onclick="ribbonFilter('vencido')" id="rb-vencido" class="chip">&#128308; Vencidas: <strong id="rb-n-vencido">0</strong></button>
+  <button onclick="ribbonFilter('proximo')" id="rb-proximo" class="chip">&#128992; Proximas: <strong id="rb-n-proximo">0</strong></button>
+  <button onclick="ribbonFilter('ok')" id="rb-ok" class="chip">&#9989; En plazo: <strong id="rb-n-ok">0</strong></button>
+  <button onclick="ribbonFilter('caduc')" id="rb-caduc" class="chip">&#9879;&#65039; Caduc. proxima: <strong id="rb-n-caduc">0</strong></button>
+  <button onclick="ribbonFilter('sinfirma')" id="rb-sinfirma" class="chip">&#9999;&#65039; Sin firma: <strong id="rb-n-sinfirma">0</strong></button>
+</div>
+<div class="flex-1 overflow-y-auto p-5">
+<div id="uploadSection" class="max-w-xl mx-auto mt-10">
+  <div id="dropZone" class="border-2 border-dashed rounded-xl p-14 text-center transition-all cursor-pointer" style="border-color:hsl(var(--border))">
+    <div class="flex flex-col items-center gap-4">
+      <div class="rounded-full p-4" style="background:hsl(var(--secondary))"><svg class="h-8 w-8" style="color:hsl(var(--muted-foreground))" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg></div>
+      <div><p class="text-sm font-medium">Arrastra tu archivo Excel aqui</p><p class="text-xs mt-1" style="color:hsl(var(--muted-foreground))">o haz clic para seleccionar &middot; Cabeceras en fila 2</p></div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
+      <button onclick="document.getElementById('fileInput').click()" class="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4" style="background:hsl(var(--primary));color:hsl(var(--primary-foreground))">Seleccionar archivo</button>
+      <p id="fileName" class="text-xs" style="color:hsl(var(--muted-foreground))"></p>
+    </div>
+  </div>
+</div>
+<div id="loading" class="hidden text-center py-14">
+  <div class="inline-flex items-center gap-3 px-6 py-3 rounded-lg" style="background:hsl(var(--secondary))">
+    <div class="animate-spin rounded-full h-4 w-4 border-2 border-t-transparent" style="border-color:hsl(var(--primary))"></div>
+    <p class="text-sm font-medium">Procesando datos...</p>
+  </div>
+</div>
+<div id="dashboardContent" class="hidden space-y-5">
+<div id="vista-general" class="space-y-5">
+  <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <div class="flex items-center justify-between pb-2">
+        <h3 class="text-sm font-medium" style="color:hsl(var(--muted-foreground))">Total Muestras</h3>
+        <svg class="h-4 w-4" style="color:hsl(var(--muted-foreground))" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      </div>
+      <div id="totalMuestras" class="text-2xl font-bold" style="color:hsl(var(--foreground))">0</div>
+      <p class="text-xs mt-1" style="color:hsl(var(--muted-foreground))">Muestras pendientes</p>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <div class="flex items-center justify-between pb-2">
+        <h3 class="text-sm font-medium" style="color:hsl(var(--muted-foreground))">Vencidas</h3>
+        <svg class="h-4 w-4" style="color:hsl(var(--muted-foreground))" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      </div>
+      <div id="muestrasVencidas" class="text-2xl font-bold" style="color:hsl(var(--destructive))">0</div>
+      <p class="text-xs mt-1" style="color:hsl(var(--muted-foreground))">Requieren atencion</p>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <div class="flex items-center justify-between pb-2">
+        <h3 class="text-sm font-medium" style="color:hsl(var(--muted-foreground))">Proximas a vencer</h3>
+        <svg class="h-4 w-4" style="color:hsl(var(--muted-foreground))" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <div id="muestrasProximas" class="text-2xl font-bold" class="text-orange-600">0</div>
+      <p class="text-xs mt-1" style="color:hsl(var(--muted-foreground))">Vencen en 7 dias o menos</p>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <div class="flex items-center justify-between pb-2">
+        <h3 class="text-sm font-medium" style="color:hsl(var(--muted-foreground))">Dias Espera prom.</h3>
+        <svg class="h-4 w-4" style="color:hsl(var(--muted-foreground))" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+      </div>
+      <div id="tiempoPromedio" class="text-2xl font-bold" style="color:hsl(var(--foreground))">0</div>
+      <p class="text-xs mt-1" style="color:hsl(var(--muted-foreground))">dias desde recepcion</p>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <div class="flex items-center justify-between pb-2">
+        <h3 class="text-sm font-medium" style="color:hsl(var(--muted-foreground))">Caducidad Proxima</h3>
+        <svg class="h-4 w-4" style="color:hsl(var(--muted-foreground))" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+      </div>
+      <div id="caducidadCard" class="text-2xl font-bold" class="text-orange-500">0</div>
+      <p class="text-xs mt-1" style="color:hsl(var(--muted-foreground))">Vencen en menos de 30 dias</p>
+    </div>
+  </div>
+  <div class="grid gap-4 md:grid-cols-2">
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 id="titulo-areaChart" class="text-base font-semibold mb-4">Distribucion por Area</h3>
+      <div class="chart-container"><canvas id="areaChart"></canvas></div>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 id="titulo-vencimientoChart" class="text-base font-semibold mb-4">Estado de Vencimientos</h3>
+      <div class="chart-container"><canvas id="vencimientoChart"></canvas></div>
+    </div>
+  </div>
+  <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="p-5 border-b" style="border-color:hsl(var(--border))"><h3 class="text-base font-semibold">Alertas Recientes</h3></div>
+    <div class="p-5"><div id="recentAlerts" class="space-y-3"></div></div>
+  </div>
+</div>
+<div id="vista-miidia" class="hidden space-y-5">
+  <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--primary));border-color:hsl(var(--primary))">
+    <p id="midia-fecha" class="text-sm opacity-80" style="color:hsl(var(--primary-foreground))"></p>
+    <p id="midia-saludo" class="text-xl font-bold mt-1" style="color:hsl(var(--primary-foreground))">Bienvenido</p>
+  </div>
+  <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="p-4 border-b flex items-center gap-2" style="border-color:hsl(var(--border))">
+      <span class="text-base">&#128308;</span>
+      <h3 class="text-sm font-semibold">CRITICO: Vencidas + Vence hoy</h3>
+      <span id="midia-critico-count" class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style="background:hsl(var(--muted))">0</span>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full min-w-[600px]">
+      <thead class="border-b" style="background:hsl(var(--muted));border-color:hsl(var(--border))"><tr>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Muestra</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Cliente</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Fecha</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Dias restantes</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Area</th>
+      </tr></thead>
+      <tbody id="midia-critico-body"></tbody>
+    </table></div>
+  </div>
+  <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="p-4 border-b flex items-center gap-2" style="border-color:hsl(var(--border))">
+      <span class="text-base">&#128992;</span>
+      <h3 class="text-sm font-semibold">URGENTE: Vence manana o en 2-3 dias</h3>
+      <span id="midia-urgente-count" class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style="background:hsl(var(--muted))">0</span>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full min-w-[600px]">
+      <thead class="border-b" style="background:hsl(var(--muted));border-color:hsl(var(--border))"><tr>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Muestra</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Cliente</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Fecha</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Dias restantes</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Area</th>
+      </tr></thead>
+      <tbody id="midia-urgente-body"></tbody>
+    </table></div>
+  </div>
+  <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="p-4 border-b flex items-center gap-2" style="border-color:hsl(var(--border))">
+      <span class="text-base">&#128993;</span>
+      <h3 class="text-sm font-semibold">ESTA SEMANA: Vence en 4-7 dias</h3>
+      <span id="midia-semana-count" class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style="background:hsl(var(--muted))">0</span>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full min-w-[600px]">
+      <thead class="border-b" style="background:hsl(var(--muted));border-color:hsl(var(--border))"><tr>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Muestra</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Cliente</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Fecha</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Dias restantes</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Area</th>
+      </tr></thead>
+      <tbody id="midia-semana-body"></tbody>
+    </table></div>
+  </div>
+  <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="p-4 border-b flex items-center gap-2" style="border-color:hsl(var(--border))">
+      <span class="text-base">&#9879;&#65039;</span>
+      <h3 class="text-sm font-semibold">CADUCIDAD PROXIMA: F.Caduc &le; 30 dias</h3>
+      <span id="midia-caduc-count" class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style="background:hsl(var(--muted))">0</span>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full min-w-[600px]">
+      <thead class="border-b" style="background:hsl(var(--muted));border-color:hsl(var(--border))"><tr>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Muestra</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Cliente</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Fecha</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Dias restantes</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Area</th>
+      </tr></thead>
+      <tbody id="midia-caduc-body"></tbody>
+    </table></div>
+  </div>
+  <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="p-4 border-b flex items-center gap-2" style="border-color:hsl(var(--border))">
+      <span class="text-base">&#9999;&#65039;</span>
+      <h3 class="text-sm font-semibold">Sin Firma</h3>
+      <span id="midia-sinfirma-count" class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style="background:hsl(var(--muted))">0</span>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full min-w-[600px]">
+      <thead class="border-b" style="background:hsl(var(--muted));border-color:hsl(var(--border))"><tr>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Muestra</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Cliente</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Fecha</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Dias restantes</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Area</th>
+      </tr></thead>
+      <tbody id="midia-sinfirma-body"></tbody>
+    </table></div>
+  </div>
+  <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="p-4 border-b flex items-center gap-2" style="border-color:hsl(var(--border))">
+      <span class="text-base">&#128300;</span>
+      <h3 class="text-sm font-semibold">Sin FinAna</h3>
+      <span id="midia-finana-count" class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style="background:hsl(var(--muted))">0</span>
+    </div>
+    <div class="overflow-x-auto"><table class="w-full min-w-[600px]">
+      <thead class="border-b" style="background:hsl(var(--muted));border-color:hsl(var(--border))"><tr>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Muestra</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Cliente</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Fecha</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Dias restantes</th>
+        <th class="h-10 px-3 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Area</th>
+      </tr></thead>
+      <tbody id="midia-finana-body"></tbody>
+    </table></div>
+  </div>
+</div>
+<div id="vista-kpi" class="hidden space-y-5">
+  <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 class="text-sm font-medium mb-3" style="color:hsl(var(--muted-foreground))">Tasa de Cumplimiento</h3>
+      <div class="text-3xl font-bold mb-2" id="kpiCumplimiento">0</div>
+      <div class="w-full rounded-full h-2 mb-2" style="background:hsl(var(--secondary))"><div id="kpiCumplimientoBar" class="bg-green-600 h-full rounded-full transition-all" style="width:0%"></div></div>
+      <p class="text-xs" style="color:hsl(var(--muted-foreground))">Muestras en plazo</p>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 class="text-sm font-medium mb-3" style="color:hsl(var(--muted-foreground))">Eficiencia de Plazo</h3>
+      <div class="text-3xl font-bold mb-2" id="kpiEficiencia">0</div>
+      <div class="w-full rounded-full h-2 mb-2" style="background:hsl(var(--secondary))"><div id="kpiEficienciaBar" class="bg-blue-600 h-full rounded-full transition-all" style="width:0%"></div></div>
+      <p class="text-xs" style="color:hsl(var(--muted-foreground))">Tiempo restante vs plazo (prom)</p>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 class="text-sm font-medium mb-3" style="color:hsl(var(--muted-foreground))">Carga Promedio</h3>
+      <div class="text-3xl font-bold mb-2" id="kpiCargaPromedio">0</div>
+      <p class="text-xs" style="color:hsl(var(--muted-foreground))">Muestras por persona</p>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 class="text-sm font-medium mb-3" style="color:hsl(var(--muted-foreground))">Clientes Activos</h3>
+      <div class="text-3xl font-bold mb-2" id="kpiClientesActivos">0</div>
+      <p class="text-xs" style="color:hsl(var(--muted-foreground))">Clientes con muestras pendientes</p>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 class="text-sm font-medium mb-3" style="color:hsl(var(--muted-foreground))">Metodos Utilizados</h3>
+      <div class="text-3xl font-bold mb-2" id="kpiMetodos">0</div>
+      <p class="text-xs" style="color:hsl(var(--muted-foreground))">Metodos de analisis distintos</p>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 class="text-sm font-medium mb-3" style="color:hsl(var(--muted-foreground))">Plazo Promedio</h3>
+      <div class="text-3xl font-bold mb-2" id="kpiTiempoRespuesta">0</div>
+      <p class="text-xs" style="color:hsl(var(--muted-foreground))">Dias plazo medio F.Rec -> F.Limite</p>
+    </div>
+  </div>
+  <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="p-5 border-b" style="border-color:hsl(var(--border))"><h3 class="text-base font-semibold">SLA por Area</h3></div>
+    <div class="overflow-x-auto"><table class="w-full min-w-[700px]">
+      <thead class="border-b" style="background:hsl(var(--muted));border-color:hsl(var(--border))"><tr>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Area</th>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Total</th>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">En Plazo</th>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Vencidas</th>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Proximas</th>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">% Cumplimiento</th>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Dias Espera Prom</th>
+      </tr></thead>
+      <tbody id="slaAreaBody"></tbody>
+    </table></div>
+  </div>
+  <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <h3 class="text-base font-semibold mb-4">Tendencias de Rendimiento</h3>
+    <div class="chart-container" style="height:380px"><canvas id="trendsChart"></canvas></div>
+  </div>
+</div>
+<div id="vista-graficas" class="hidden space-y-5">
+  <div class="grid gap-4 md:grid-cols-2">
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 id="titulo-areaChart2" class="text-base font-semibold mb-4">Distribucion por Area</h3>
+      <div class="chart-container"><canvas id="areaChart2"></canvas></div>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 id="titulo-clienteChart" class="text-base font-semibold mb-4">Top 5 Clientes</h3>
+      <div class="chart-container"><canvas id="clienteChart"></canvas></div>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 id="titulo-matrizChart" class="text-base font-semibold mb-4">Distribucion por Matriz</h3>
+      <div class="chart-container"><canvas id="matrizChart"></canvas></div>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 id="titulo-parametroChart" class="text-base font-semibold mb-4">Top 10 Parametros</h3>
+      <div class="chart-container"><canvas id="parametroChart"></canvas></div>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 id="titulo-metodoChart" class="text-base font-semibold mb-4">Muestras por Metodo</h3>
+      <div class="chart-container"><canvas id="metodoChart"></canvas></div>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 id="titulo-cecoChart" class="text-base font-semibold mb-4">Distribucion por CECO</h3>
+      <div class="chart-container"><canvas id="cecoChart"></canvas></div>
+    </div>
+  </div>
+  <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <h3 class="text-base font-semibold mb-4">Dias Espera vs Dias Plazo por Muestra</h3>
+    <div class="chart-container" style="height:400px"><canvas id="evolucionChart"></canvas></div>
+  </div>
+</div>
+<div id="vista-tablas" class="hidden space-y-5">
+  <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <h3 class="text-sm font-semibold mb-3">Filtros</h3>
+    <div class="grid gap-3 md:grid-cols-5">
+      <select id="filterArea" class="flex h-9 rounded-md border px-3 py-2 text-sm focus:outline-none" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
+        <option value="">Todas las areas</option>
+      </select>
+      <select id="filterCliente" class="flex h-9 rounded-md border px-3 py-2 text-sm focus:outline-none" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
+        <option value="">Todos los clientes</option>
+      </select>
+      <select id="filterParametro" class="flex h-9 rounded-md border px-3 py-2 text-sm focus:outline-none" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
+        <option value="">Todos los parametros</option>
+      </select>
+      <select id="filterEstado" class="flex h-9 rounded-md border px-3 py-2 text-sm focus:outline-none" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
+        <option value="">Todos los estados</option>
+        <option value="vencido">Vencidos</option>
+        <option value="proximo">Proximos</option>
+        <option value="ok">En plazo</option>
+      </select>
+      <select id="filterPersona" class="flex h-9 rounded-md border px-3 py-2 text-sm focus:outline-none" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
+        <option value="">Todas las personas</option>
+      </select>
+    </div>
+    <div class="flex flex-wrap gap-2 mt-3">
+      <button id="chip-vencidas" onclick="setQuickFilter('vencidas')" class="chip">&#128308; Vencidas</button>
+      <button id="chip-proximas" onclick="setQuickFilter('proximas')" class="chip">&#9888;&#65039; Proximas</button>
+      <button id="chip-hoy" onclick="setQuickFilter('hoy')" class="chip">&#9889; Hoy</button>
+      <button id="chip-semana" onclick="setQuickFilter('semana')" class="chip">&#128197; Esta semana</button>
+      <button id="chip-sinfirma" onclick="setQuickFilter('sinfirma')" class="chip">&#9999;&#65039; Sin firma</button>
+      <button id="chip-finana" onclick="setQuickFilter('finana')" class="chip">&#128300; Sin FinAna</button>
+      <button id="chip-enplazo" onclick="setQuickFilter('enplazo')" class="chip">&#9989; En plazo</button>
+      <button onclick="setQuickFilter('')" class="chip">x Limpiar</button>
+    </div>
+  </div>
+  <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="p-4 border-b flex items-center justify-between gap-3" style="border-color:hsl(var(--border))">
+      <div class="flex items-center gap-3">
+        <h3 class="text-base font-semibold">Todas las Muestras</h3>
+        <span id="tablaCount" class="text-xs" style="color:hsl(var(--muted-foreground))"></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="relative">
+          <button onclick="toggleColMenu()" class="inline-flex items-center gap-1.5 rounded-md text-xs font-medium px-3 h-8 border hover:bg-muted" style="border-color:hsl(var(--border));background:hsl(var(--background))">Columnas</button>
+          <div id="colToggleMenu">
+            <label class="flex items-center gap-2 px-4 py-2 text-sm cursor-pointer hover:bg-muted"><input type="checkbox" id="col-matriz" checked onchange="aplicarFiltrosTabla()"> Matriz</label>
+            <label class="flex items-center gap-2 px-4 py-2 text-sm cursor-pointer hover:bg-muted"><input type="checkbox" id="col-codigo" checked onchange="aplicarFiltrosTabla()"> Codigo</label>
+            <label class="flex items-center gap-2 px-4 py-2 text-sm cursor-pointer hover:bg-muted"><input type="checkbox" id="col-metodo" checked onchange="aplicarFiltrosTabla()"> Metodo</label>
+            <label class="flex items-center gap-2 px-4 py-2 text-sm cursor-pointer hover:bg-muted"><input type="checkbox" id="col-diasplazo" checked onchange="aplicarFiltrosTabla()"> Dias Plazo</label>
+            <label class="flex items-center gap-2 px-4 py-2 text-sm cursor-pointer hover:bg-muted"><input type="checkbox" id="col-frecepcion" checked onchange="aplicarFiltrosTabla()"> F. Recepcion</label>
+            <label class="flex items-center gap-2 px-4 py-2 text-sm cursor-pointer hover:bg-muted"><input type="checkbox" id="col-progreso" checked onchange="aplicarFiltrosTabla()"> Progreso</label>
+          </div>
+        </div>
+        <input type="text" id="searchTable" placeholder="Buscar..." class="h-8 rounded-md border px-3 text-sm focus:outline-none" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <div class="max-h-[520px] overflow-y-auto">
+        <table class="w-full min-w-[900px]">
+          <thead id="tablaPrincipal-head" class="border-b sticky top-0" style="background:hsl(var(--muted));border-color:hsl(var(--border))">
+            <tr>
+              <th data-col="Muestra" onclick="ordenarTabla('Muestra')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Muestra<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="F. Recepcion" onclick="ordenarTabla('F. Recepcion')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" data-col-toggle="col-frecepcion" style="color:hsl(var(--muted-foreground))">F. Recepcion<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="Cliente" onclick="ordenarTabla('Cliente')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Cliente<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="Matriz" onclick="ordenarTabla('Matriz')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" data-col-toggle="col-matriz" style="color:hsl(var(--muted-foreground))">Matriz<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="Parametro" onclick="ordenarTabla('Parametro')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Parametro<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="Codigo" onclick="ordenarTabla('Codigo')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" data-col-toggle="col-codigo" style="color:hsl(var(--muted-foreground))">Codigo<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="F.Limite" onclick="ordenarTabla('F.Limite')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" style="color:hsl(var(--muted-foreground))">F.Limite<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="Area" onclick="ordenarTabla('Area')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Area<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="Metodo" onclick="ordenarTabla('Metodo')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" data-col-toggle="col-metodo" style="color:hsl(var(--muted-foreground))">Metodo<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="Persona" onclick="ordenarTabla('Persona')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Persona<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="diasEspera" onclick="ordenarTabla('diasEspera')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Dias Espera<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="diasPlazo" onclick="ordenarTabla('diasPlazo')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" data-col-toggle="col-diasplazo" style="color:hsl(var(--muted-foreground))">Dias Plazo<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="estadoVencimiento" onclick="ordenarTabla('estadoVencimiento')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Estado<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+              <th data-col="progreso" onclick="ordenarTabla('progreso')" class="h-11 px-3 text-left align-middle font-medium text-xs whitespace-nowrap" data-col-toggle="col-progreso" style="color:hsl(var(--muted-foreground))">Progreso<span class="sort-indicator font-bold ml-0.5" style="color:hsl(var(--primary))"></span></th>
+            </tr>
+          </thead>
+          <tbody id="tablaPrincipal"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="paginacion" class="flex items-center justify-between px-5 py-3 border-t" style="border-color:hsl(var(--border))">
+      <button onclick="cambiarPagina(-1)" class="inline-flex items-center gap-1 text-xs font-medium px-3 h-7 rounded border hover:bg-muted" style="border-color:hsl(var(--border))">&#8592; Anterior</button>
+      <span id="paginaInfo" class="text-xs" style="color:hsl(var(--muted-foreground))">Pagina 1 de 1</span>
+      <button onclick="cambiarPagina(1)" class="inline-flex items-center gap-1 text-xs font-medium px-3 h-7 rounded border hover:bg-muted" style="border-color:hsl(var(--border))">Siguiente &#8594;</button>
+    </div>
+  </div>
+</div>
+<div id="vista-analisis" class="hidden space-y-5">
+  <div class="grid gap-5 md:grid-cols-2">
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 class="text-base font-semibold mb-4">Distribucion por Prioridad</h3>
+      <div id="analisisPrioridad" class="space-y-3"></div>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 class="text-base font-semibold mb-4">Top 10 Parametros</h3>
+      <div class="chart-container"><canvas id="parametrosChart"></canvas></div>
+    </div>
+    <div class="rounded-lg border p-5 shadow-sm col-span-2" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+      <h3 class="text-base font-semibold mb-4">Dias Espera vs Dias Plazo</h3>
+      <div class="chart-container" style="height:350px"><canvas id="plazosChart"></canvas></div>
+    </div>
+  </div>
+</div>
+<div id="vista-alertas" class="hidden space-y-5">
+  <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="flex border-b overflow-x-auto" style="border-color:hsl(var(--border))">
+      <button id="atab-plazo" onclick="switchAlertTab('atab-plazo')" class="alert-tab active">&#9201; Plazo <span id="atab-plazo-count" class="ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full" style="background:hsl(var(--muted))">0</span></button>
+      <button id="atab-caduc" onclick="switchAlertTab('atab-caduc')" class="alert-tab">&#9879;&#65039; Caducidad <span id="atab-caduc-count" class="ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full" style="background:hsl(var(--muted))">0</span></button>
+      <button id="atab-firma" onclick="switchAlertTab('atab-firma')" class="alert-tab">&#9999;&#65039; Sin Firma <span id="atab-firma-count" class="ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full" style="background:hsl(var(--muted))">0</span></button>
+      <button id="atab-finana" onclick="switchAlertTab('atab-finana')" class="alert-tab">&#128300; Sin FinAna <span id="atab-finana-count" class="ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full" style="background:hsl(var(--muted))">0</span></button>
+    </div>
+    <div id="apanel-plazo" class=" overflow-x-auto">
+      <div class="max-h-[520px] overflow-y-auto">
+      <table class="w-full min-w-[800px]">
+        <thead class="border-b sticky top-0" style="background:hsl(var(--muted));border-color:hsl(var(--border))"><tr>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Muestra</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">F.Limite</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Cliente</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Parametro</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Area</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Dias para Vencer</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Persona</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Estado</th>
+        </tr></thead>
+        <tbody id="apanel-plazo-body"></tbody>
+      </table>
+      </div>
+    </div>
+    <div id="apanel-caduc" class=" hidden overflow-x-auto">
+      <div class="max-h-[520px] overflow-y-auto">
+      <table class="w-full min-w-[800px]">
+        <thead class="border-b sticky top-0" style="background:hsl(var(--muted));border-color:hsl(var(--border))"><tr>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Muestra</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">F. Caduc</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Cliente</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Parametro</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Area</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Dias para Caducar</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Persona</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Est. Caducidad</th>
+        </tr></thead>
+        <tbody id="apanel-caduc-body"></tbody>
+      </table>
+      </div>
+    </div>
+    <div id="apanel-firma" class=" hidden overflow-x-auto">
+      <div class="max-h-[520px] overflow-y-auto">
+      <table class="w-full min-w-[800px]">
+        <thead class="border-b sticky top-0" style="background:hsl(var(--muted));border-color:hsl(var(--border))"><tr>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Muestra</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">F.Limite</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Cliente</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Parametro</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Area</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Dias Espera</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Persona</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Firma</th>
+        </tr></thead>
+        <tbody id="apanel-firma-body"></tbody>
+      </table>
+      </div>
+    </div>
+    <div id="apanel-finana" class=" hidden overflow-x-auto">
+      <div class="max-h-[520px] overflow-y-auto">
+      <table class="w-full min-w-[800px]">
+        <thead class="border-b sticky top-0" style="background:hsl(var(--muted));border-color:hsl(var(--border))"><tr>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Muestra</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">F.Limite</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Cliente</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Parametro</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Area</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Dias Espera</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">Persona</th>
+          <th class="h-10 px-4 text-left text-xs font-medium whitespace-nowrap" style="color:hsl(var(--muted-foreground))">FinAna</th>
+        </tr></thead>
+        <tbody id="apanel-finana-body"></tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="vista-equipo" class="hidden space-y-5">
+  <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="p-5 border-b" style="border-color:hsl(var(--border))"><h3 class="text-base font-semibold">Carga de Trabajo por Persona</h3></div>
+    <div class="overflow-x-auto"><table class="w-full min-w-[700px]">
+      <thead class="border-b" style="background:hsl(var(--muted));border-color:hsl(var(--border))"><tr>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Persona</th>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Muestras</th>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Vencidas</th>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Proximas</th>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Rendimiento</th>
+        <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Carga</th>
+      </tr></thead>
+      <tbody id="cargaPersonaBody"></tbody>
+    </table></div>
+  </div>
+  <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <h3 class="text-base font-semibold mb-4">Rendimiento por Analista</h3>
+    <div id="heatmapContainer" class="space-y-2"></div>
+  </div>
+  <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <h3 class="text-base font-semibold mb-4">Distribucion de Carga</h3>
+    <div class="chart-container" style="height:400px"><canvas id="cargaEquipoChart"></canvas></div>
+  </div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<div id="detailModal" onclick="handleModalClick(event)">
+  <div class="modal-backdrop"></div>
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-xl font-bold">Detalle de Muestra</h2>
+      <button onclick="cerrarModal()" class="p-2 rounded-md hover:bg-muted" style="color:hsl(var(--muted-foreground))">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+<div id="toastContainer"></div>
+<script>
+
+// ─── Global State ───────────────────────────────────────────────────────────
+let datosGlobales   = [];
+let datosOriginales = [];
+let charts          = {};
+let vistaActual     = 'general';
+let personasActuales = [];
+let areaActual       = '';
+let tablaOrden      = { col: null, dir: 'asc' };
+let filtrosListenersAttached = false;
+let paginaActual    = 1;
+const FILAS_PAGINA  = 50;
+let filtradosActual = [];
+let quickFilterActivo = '';
+let ribbonFilterActivo = '';
+
+const LS_RAW  = 'labDashboard_v3_raw';
+const LS_META = 'labDashboard_v3_meta';
+const LS_DARK = 'lab_darkmode';
+
+// ─── Dark Mode ──────────────────────────────────────────────────────────────
+function toggleDarkMode() {
+    const html = document.documentElement;
+    const isDark = html.classList.toggle('dark');
+    localStorage.setItem(LS_DARK, isDark ? '1' : '0');
+    document.getElementById('iconMoon').classList.toggle('hidden', isDark);
+    document.getElementById('iconSun').classList.toggle('hidden', !isDark);
+    actualizarColoresChart();
+}
+function initDarkMode() {
+    const saved = localStorage.getItem(LS_DARK);
+    const isDark = saved === '1';
+    if (isDark) document.documentElement.classList.add('dark');
+    document.getElementById('iconMoon').classList.toggle('hidden', isDark);
+    document.getElementById('iconSun').classList.toggle('hidden', !isDark);
+}
+function actualizarColoresChart() {
+    // Rebuild visible charts after dark toggle
+    if (vistaActual === 'general') { actualizarGraficos(); }
+    else if (vistaActual === 'graficas') { actualizarGraficasAvanzadas(); }
+    else if (vistaActual === 'kpi') { actualizarKPIsAvanzados(); }
+    else if (vistaActual === 'analisis') { actualizarAnalisisAvanzado(); }
+    else if (vistaActual === 'equipo') { actualizarGraficoEquipo(); }
+}
+
+// ─── Sidebar ────────────────────────────────────────────────────────────────
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+}
+
+// ─── Date Parsing ───────────────────────────────────────────────────────────
+function parseFecha(val) {
+    if (!val) return null;
+    if (val instanceof Date && !isNaN(val)) return val;
+    const s = String(val).trim();
+    const iso = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if (iso) { const d=new Date(+iso[1],+iso[2]-1,+iso[3]); if(!isNaN(d)) return d; }
+    const dmy = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+    if (dmy) { const d=new Date(+dmy[3],+dmy[2]-1,+dmy[1]); if(!isNaN(d)) return d; }
+    const serial = parseFloat(s);
+    if (!isNaN(serial) && serial > 1000) {
+        const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
+        if (!isNaN(d)) return d;
+    }
+    return null;
+}
+function formatFecha(val) {
+    const d = parseFecha(val);
+    if (!d) return val || '-';
+    return d.toLocaleDateString('es-ES', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+// ─── Data Processing ────────────────────────────────────────────────────────
+function procesarDatos(data) {
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    return data.map(row => {
+        const fr = parseFecha(row['F. Recepcion'] || row['F. Recepción']);
+        const fl = parseFecha(row['F.Limite'] || row['F.Límite']);
+        const fc = parseFecha(row['F. Caduc']);
+
+        const diasEspera    = fr ? Math.floor((hoy - fr) / 86400000) : 0;
+        const diasPlazo     = (fr && fl) ? Math.floor((fl - fr) / 86400000) : 0;
+        const diasParaVencer= fl ? Math.ceil((fl - hoy) / 86400000) : 0;
+        const pctPlazo      = diasPlazo > 0 ? Math.round((diasEspera / diasPlazo) * 100) : 0;
+        const diasParaCaducar = fc ? Math.ceil((fc - hoy) / 86400000) : null;
+
+        let estadoVencimiento = 'ok';
+        if (diasParaVencer < 0) estadoVencimiento = 'vencido';
+        else if (diasParaVencer <= 7) estadoVencimiento = 'proximo';
+
+        let estadoCaducidad = 'ok';
+        if (diasParaCaducar !== null) {
+            if (diasParaCaducar < 0) estadoCaducidad = 'caducado';
+            else if (diasParaCaducar <= 30) estadoCaducidad = 'proxima';
+        }
+
+        const firmado        = !!(row['Firma']  && String(row['Firma']).trim());
+        const finAnaCompleto = !!(row['FinAna'] && String(row['FinAna']).trim());
+
+        // Normalise key names (handle both accent and no-accent versions)
+        const out = { ...row };
+        // Ensure standard keys
+        if (row['F. Recepción']) out['F. Recepcion'] = row['F. Recepción'];
+        if (row['F.Límite'])     out['F.Limite']     = row['F.Límite'];
+        if (row['Método'])       out['Metodo']       = row['Método'];
+        if (row['Parámetro'])    out['Parametro']    = row['Parámetro'];
+        if (row['Área'])         out['Area']         = row['Área'];
+        if (row['Código'])       out['Codigo']       = row['Código'];
+
+        return { ...out, diasEspera, diasPlazo, diasParaVencer, pctPlazo,
+                 diasParaCaducar, estadoVencimiento, estadoCaducidad,
+                 firmado, finAnaCompleto };
+    });
+}
+
+// ─── Excel Reader ────────────────────────────────────────────────────────────
+function leerExcel(arrayBuffer) {
+    const wb = XLSX.read(new Uint8Array(arrayBuffer), { type:'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const allRows = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, dateNF:'yyyy-mm-dd', defval:'' });
+    if (allRows.length < 2) throw new Error('El archivo no tiene suficientes filas');
+    const headers  = allRows[1];
+    const dataRows = allRows.slice(2);
+    return dataRows
+        .map(row => {
+            const obj = {};
+            headers.forEach((h,i) => { if (h !== '' && h != null) obj[String(h).trim()] = row[i] !== undefined ? row[i] : ''; });
+            return obj;
+        })
+        .filter(row => (row['Muestra'] && String(row['Muestra']).trim() !== ''));
+}
+
+// ─── File Handling ───────────────────────────────────────────────────────────
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+['dragenter','dragover','dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, e=>{e.preventDefault();e.stopPropagation();}));
+['dragenter','dragover'].forEach(ev => dropZone.addEventListener(ev, ()=>dropZone.classList.add('drag-over')));
+['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, ()=>dropZone.classList.remove('drag-over')));
+dropZone.addEventListener('drop', e=>handleFiles(e.dataTransfer.files));
+fileInput.addEventListener('change', e=>handleFiles(e.target.files));
+dropZone.addEventListener('click', ()=>fileInput.click());
+
+function handleFiles(files) {
+    if (!files.length) return;
+    const file = files[0];
+    if (!file.name.match(/\.(xlsx|xls)$/i)) { mostrarToast('Selecciona un archivo Excel (.xlsx o .xls)', 'error'); return; }
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('uploadSection').classList.add('hidden');
+    document.getElementById('loading').classList.remove('hidden');
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const rawData = leerExcel(e.target.result);
+            datosOriginales = procesarDatos(rawData);
+            datosGlobales   = [...datosOriginales];
+            guardarEnLocalStorage(rawData);
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('dashboardContent').classList.remove('hidden');
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleString('es-ES');
+            document.getElementById('btnNuevoArchivo').classList.remove('hidden');
+            poblarAreas(); poblarPuestosTrabajo();
+            actualizarDashboard();
+            mostrarToast(datosOriginales.length + ' muestras cargadas correctamente', 'success');
+        } catch(err) {
+            mostrarToast('Error al leer el archivo: ' + err.message, 'error');
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('uploadSection').classList.remove('hidden');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// ─── Filters: Area + Personal (multi-select) ────────────────────────────────
+function poblarAreas() {
+    const areas = [...new Set(datosOriginales.map(d=>d.Area))].filter(Boolean).sort();
+    const sel = document.getElementById('areaSelect');
+    if (sel) {
+        sel.innerHTML = '<option value="">Todas las areas</option>' +
+            areas.map(a=>`<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+    }
+}
+function poblarPuestosTrabajo() {
+    const personal = [...new Set(datosOriginales.map(d=>d.Persona))].filter(Boolean).sort();
+    const menu = document.getElementById('personalDropdownMenu');
+    if (!menu) return;
+    menu.innerHTML =
+        `<label class="flex items-center gap-2 px-3 py-2 hover:bg-muted cursor-pointer text-xs border-b" style="border-color:hsl(var(--border))">
+          <input type="checkbox" id="persona-all" onchange="onPersonaAllChange(this)" checked>
+          <span class="font-medium">Todo el personal</span>
+        </label>` +
+        personal.map(p=>
+            `<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-muted cursor-pointer text-xs">
+              <input type="checkbox" value="${escHtml(p)}" class="persona-cb" onchange="filtrarGlobal()">
+              <span>${escHtml(p)}</span>
+            </label>`
+        ).join('');
+}
+function togglePersonalDropdown() {
+    const menu = document.getElementById('personalDropdownMenu');
+    if (menu) menu.classList.toggle('hidden');
+}
+function onPersonaAllChange(cb) {
+    if (cb.checked) {
+        document.querySelectorAll('.persona-cb').forEach(c=>{ c.checked=false; });
+    }
+    filtrarGlobal();
+}
+function filtrarGlobal() {
+    const areaEl = document.getElementById('areaSelect');
+    areaActual = areaEl ? areaEl.value : '';
+    const cbs = [...document.querySelectorAll('.persona-cb:checked')];
+    personasActuales = cbs.map(c=>c.value);
+    const cbAll = document.getElementById('persona-all');
+    if (cbAll) cbAll.checked = personasActuales.length === 0;
+    // Update avatar & label
+    const av = document.getElementById('avatar');
+    const analistaEl = document.getElementById('analista');
+    const lbl = document.getElementById('personalDropdownLabel');
+    if (personasActuales.length === 1) {
+        if (av) av.textContent = personasActuales[0].substring(0,3).toUpperCase();
+        if (analistaEl) analistaEl.textContent = personasActuales[0];
+        if (lbl) lbl.textContent = personasActuales[0];
+    } else if (personasActuales.length > 1) {
+        if (av) av.textContent = personasActuales.length+'P';
+        if (analistaEl) analistaEl.textContent = personasActuales.length+' personas';
+        if (lbl) lbl.textContent = personasActuales.length+' personas seleccionadas';
+    } else {
+        if (av) av.textContent = areaActual ? areaActual.substring(0,3).toUpperCase() : 'ALL';
+        if (analistaEl) analistaEl.textContent = areaActual ? 'Area: '+areaActual : 'Todo el personal';
+        if (lbl) lbl.textContent = 'Todo el personal';
+    }
+    datosGlobales = datosOriginales.filter(d=>{
+        const personaOk = personasActuales.length === 0 || personasActuales.includes(d.Persona||'');
+        const areaOk    = areaActual === '' || (d.Area||'') === areaActual;
+        return personaOk && areaOk;
+    });
+    ribbonFilterActivo = ''; quickFilterActivo = '';
+    actualizarDashboard();
+    if (vistaActual !== 'general') renderVista(vistaActual);
+    if (datosGlobales.length === 0 && (personasActuales.length > 0 || areaActual))
+        mostrarToast('No hay muestras con los filtros seleccionados', 'warning');
+}
+function limpiarFiltros() {
+    personasActuales = []; areaActual = '';
+    const areaEl = document.getElementById('areaSelect');
+    if (areaEl) areaEl.value = '';
+    document.querySelectorAll('.persona-cb').forEach(c=>{ c.checked=false; });
+    const cbAll = document.getElementById('persona-all');
+    if (cbAll) cbAll.checked = true;
+    filtrarGlobal();
+}
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ─── Navigation ─────────────────────────────────────────────────────────────
+function cambiarVista(vista) {
+    const vistas = ['general','miidia','kpi','graficas','tablas','analisis','alertas','equipo'];
+    document.querySelectorAll('aside nav button').forEach(btn=>btn.classList.remove('sidebar-active'));
+    const navBtn = document.getElementById('nav-'+vista);
+    if (navBtn) navBtn.classList.add('sidebar-active');
+    vistas.forEach(v => { const el=document.getElementById('vista-'+v); if(el) el.classList.add('hidden'); });
+    const vistaEl = document.getElementById('vista-'+vista);
+    if (vistaEl) vistaEl.classList.remove('hidden');
+    vistaActual = vista;
+    const titles = {
+        general: ['Vision General','Resumen de todas las muestras'],
+        miidia:  ['Mi Dia','Dashboard personalizado del analista'],
+        kpi:     ['Indicadores KPI','Metricas clave de rendimiento'],
+        graficas:['Graficas','Visualizacion de datos'],
+        tablas:  ['Tablas Detalladas','Vista completa de todas las muestras'],
+        analisis:['Analisis Avanzado','Analisis y tendencias'],
+        alertas: ['Alertas','Muestras que requieren atencion'],
+        equipo:  ['Gestion de Equipo','Carga de trabajo por persona']
+    };
+    if (titles[vista]) {
+        document.getElementById('pageTitle').textContent    = titles[vista][0];
+        document.getElementById('pageSubtitle').textContent = titles[vista][1];
+    }
+    if (datosGlobales.length > 0) renderVista(vista);
+}
+function renderVista(vista) {
+    switch(vista) {
+        case 'general':  actualizarDashboard(); break;
+        case 'miidia':   actualizarMiDia(); break;
+        case 'kpi':      actualizarKPIsAvanzados(); break;
+        case 'graficas': actualizarGraficasAvanzadas(); break;
+        case 'tablas':   actualizarTablaPrincipal(); break;
+        case 'analisis': actualizarAnalisisAvanzado(); break;
+        case 'alertas':  actualizarTablaAlertas(); break;
+        case 'equipo':   actualizarCargaTrabajo(); actualizarGraficoEquipo(); actualizarHeatmap(); break;
+    }
+}
+
+// ─── Dashboard Main ─────────────────────────────────────────────────────────
+function actualizarDashboard() {
+    actualizarKPIs();
+    actualizarGraficos();
+    actualizarAlertasRecientes();
+    poblarFiltros();
+    actualizarBadgeAlertas();
+    actualizarRibbon();
+}
+
+function actualizarKPIs() {
+    const total    = datosGlobales.length;
+    const vencidas = datosGlobales.filter(d=>d.estadoVencimiento==='vencido').length;
+    const proximas = datosGlobales.filter(d=>d.estadoVencimiento==='proximo').length;
+    const promDias = total > 0 ? (datosGlobales.reduce((s,d)=>s+(d.diasEspera||0),0)/total).toFixed(1) : 0;
+    const caducProx= datosGlobales.filter(d=>d.estadoCaducidad==='proxima'||d.estadoCaducidad==='caducado').length;
+    document.getElementById('totalMuestras').textContent    = total;
+    document.getElementById('muestrasVencidas').textContent = vencidas;
+    document.getElementById('muestrasProximas').textContent = proximas;
+    document.getElementById('tiempoPromedio').textContent   = promDias;
+    document.getElementById('caducidadCard').textContent    = caducProx;
+}
+
+function actualizarBadgeAlertas() {
+    document.getElementById('alertBadge').textContent = datosGlobales.filter(d=>d.estadoVencimiento!=='ok').length;
+}
+
+function actualizarRibbon() {
+    const total    = datosGlobales.length;
+    const venc     = datosGlobales.filter(d=>d.estadoVencimiento==='vencido').length;
+    const prox     = datosGlobales.filter(d=>d.estadoVencimiento==='proximo').length;
+    const ok       = datosGlobales.filter(d=>d.estadoVencimiento==='ok').length;
+    const caduc    = datosGlobales.filter(d=>d.estadoCaducidad==='proxima'||d.estadoCaducidad==='caducado').length;
+    const sinFirma = datosGlobales.filter(d=>!d.firmado).length;
+    document.getElementById('rb-n-all').textContent    = total;
+    document.getElementById('rb-n-vencido').textContent= venc;
+    document.getElementById('rb-n-proximo').textContent= prox;
+    document.getElementById('rb-n-ok').textContent     = ok;
+    document.getElementById('rb-n-caduc').textContent  = caduc;
+    document.getElementById('rb-n-sinfirma').textContent = sinFirma;
+    const ribbon = document.getElementById('statsRibbon');
+    if (total > 0) ribbon.classList.add('visible'); else ribbon.classList.remove('visible');
+}
+
+function ribbonFilter(tipo) {
+    ribbonFilterActivo = (ribbonFilterActivo === tipo) ? '' : tipo;
+    document.querySelectorAll('[id^="rb-"]').forEach(btn=>btn.classList.remove('active'));
+    const activeId = ribbonFilterActivo === '' ? 'rb-all' : 'rb-'+ribbonFilterActivo;
+    const el = document.getElementById(activeId);
+    if (el) el.classList.add('active');
+    if (ribbonFilterActivo === '') { document.getElementById('rb-all').classList.add('active'); }
+    // If not on tablas, switch to tablas or alertas
+    if (vistaActual !== 'tablas' && vistaActual !== 'alertas') { cambiarVista('tablas'); }
+    else { aplicarFiltrosTabla(); }
+}
+
+// ─── Charts ─────────────────────────────────────────────────────────────────
+const COLORS = ['hsl(222.2 47.4% 11.2%)','hsl(215.4 16.3% 46.9%)','hsl(0 84.2% 60.2%)','hsl(24.6 95% 53.1%)','hsl(142.1 76.2% 36.3%)','hsl(280 76% 53%)','hsl(200 76% 53%)','hsl(45 93% 47%)','hsl(340 82% 52%)','hsl(160 84% 39%)'];
+
+function crearGrafico(canvasId, tipo, labels, data, colors) {
+    const ctx = document.getElementById(canvasId); if (!ctx) return;
+    if (charts[canvasId]) { charts[canvasId].destroy(); }
+    charts[canvasId] = new Chart(ctx, {
+        type: tipo,
+        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth:0, borderRadius: tipo==='bar'?4:0 }] },
+        options: {
+            responsive:true, maintainAspectRatio:false,
+            plugins: { legend: { display: tipo!=='bar', position:'right', labels:{boxWidth:12,padding:10,font:{size:10,family:'Inter'}} } },
+            scales: tipo==='bar' ? { y:{beginAtZero:true,ticks:{precision:0}} } : {}
+        }
+    });
+}
+
+function actualizarGraficos() {
+    const titulo = document.getElementById('titulo-areaChart');
+    if (personasActuales.length > 0) {
+        if (titulo) titulo.textContent = 'Parametros — ' + (personasActuales.length===1 ? personasActuales[0] : personasActuales.length+' personas');
+        const pc={};
+        datosGlobales.forEach(d=>{ const p=(d.Parametro||'Sin parametro').substring(0,50); pc[p]=(pc[p]||0)+1; });
+        const sorted=Object.entries(pc).sort((a,b)=>b[1]-a[1]).slice(0,10);
+        const ctx=document.getElementById('areaChart');
+        if(charts['areaChart']) charts['areaChart'].destroy();
+        charts['areaChart']=new Chart(ctx,{type:'bar',data:{labels:sorted.map(p=>p[0]),datasets:[{label:'Muestras',data:sorted.map(p=>p[1]),backgroundColor:'hsl(142.1 76.2% 36.3%)',borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}}}});
+    } else {
+        if (titulo) titulo.textContent = 'Distribucion por Area';
+        const ac={};
+        datosGlobales.forEach(d=>{ const a=d.Area||'Sin area'; ac[a]=(ac[a]||0)+1; });
+        crearGrafico('areaChart','doughnut',Object.keys(ac),Object.values(ac),COLORS);
+    }
+    crearGrafico('vencimientoChart','bar',['Vencidas','Proximas','En plazo'],[
+        datosGlobales.filter(d=>d.estadoVencimiento==='vencido').length,
+        datosGlobales.filter(d=>d.estadoVencimiento==='proximo').length,
+        datosGlobales.filter(d=>d.estadoVencimiento==='ok').length
+    ],['hsl(0 84.2% 60.2%)','hsl(24.6 95% 53.1%)','hsl(142.1 76.2% 36.3%)']);
+}
+
+function actualizarGraficasAvanzadas() {
+    const titulo = document.getElementById('titulo-areaChart2');
+    if (personasActuales.length > 0) {
+        if (titulo) titulo.textContent = 'Parametros — ' + (personasActuales.length===1 ? personasActuales[0] : personasActuales.length+' personas');
+        const pc={};
+        datosGlobales.forEach(d=>{ const p=(d.Parametro||'Sin parametro').substring(0,40); pc[p]=(pc[p]||0)+1; });
+        crearGrafico('areaChart2','doughnut',Object.keys(pc),Object.values(pc),COLORS);
+    } else {
+        if (titulo) titulo.textContent = 'Distribucion por Area';
+        const ac={};
+        datosGlobales.forEach(d=>{ const a=d.Area||'Sin area'; ac[a]=(ac[a]||0)+1; });
+        crearGrafico('areaChart2','doughnut',Object.keys(ac),Object.values(ac),COLORS);
+    }
+    const cc={};
+    datosGlobales.forEach(d=>{ const c=(d.Cliente||'Sin cliente').substring(0,30); cc[c]=(cc[c]||0)+1; });
+    const topC=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    crearGrafico('clienteChart','bar',topC.map(c=>c[0]),topC.map(c=>c[1]),['hsl(222.2 47.4% 11.2%)']);
+
+    const mc={};
+    datosGlobales.forEach(d=>{ const m=d.Matriz||'Sin matriz'; mc[m]=(mc[m]||0)+1; });
+    crearGrafico('matrizChart','pie',Object.keys(mc),Object.values(mc),COLORS);
+
+    const pm={};
+    datosGlobales.forEach(d=>{ const p=(d.Parametro||'Sin parametro').substring(0,30); pm[p]=(pm[p]||0)+1; });
+    const topP=Object.entries(pm).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    crearGrafico('parametroChart','bar',topP.map(p=>p[0]),topP.map(p=>p[1]),COLORS);
+
+    const mm={};
+    datosGlobales.forEach(d=>{ const m=(d.Metodo||d['Método']||'Sin metodo').substring(0,30); mm[m]=(mm[m]||0)+1; });
+    const topM=Object.entries(mm).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    crearGrafico('metodoChart','bar',topM.map(m=>m[0]),topM.map(m=>m[1]),['hsl(222.2 47.4% 11.2%)']);
+
+    // CECO chart
+    const cecoC={};
+    datosGlobales.forEach(d=>{ const c=(d.ceco||'Sin CECO').substring(0,30); cecoC[c]=(cecoC[c]||0)+1; });
+    crearGrafico('cecoChart','doughnut',Object.keys(cecoC),Object.values(cecoC),COLORS);
+
+    // Scatter
+    const ctx=document.getElementById('evolucionChart');
+    if(charts['evolucionChart']) charts['evolucionChart'].destroy();
+    const sample=datosGlobales.slice(0,200);
+    charts['evolucionChart']=new Chart(ctx,{type:'scatter',data:{datasets:[{label:'Dias Espera vs Dias Plazo',data:sample.map(d=>({x:d.diasPlazo,y:d.diasEspera,label:d.Muestra})),backgroundColor:sample.map(d=>d.estadoVencimiento==='vencido'?'hsla(0,84%,60%,.7)':d.estadoVencimiento==='proximo'?'hsla(25,95%,53%,.7)':'hsla(142,76%,36%,.7)'),pointRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true},tooltip:{callbacks:{label:c=>`${c.raw.label||''} — Espera:${c.raw.y}d, Plazo:${c.raw.x}d`}}},scales:{x:{title:{display:true,text:'Dias de Plazo'},beginAtZero:true},y:{title:{display:true,text:'Dias de Espera'},beginAtZero:true}}}});
+}
+
+// ─── KPIs Avanzados ─────────────────────────────────────────────────────────
+function actualizarKPIsAvanzados() {
+    const total   = datosGlobales.length;
+    const enPlazo = datosGlobales.filter(d=>d.estadoVencimiento==='ok').length;
+    const tasaCump= total>0 ? ((enPlazo/total)*100).toFixed(1) : 0;
+    document.getElementById('kpiCumplimiento').textContent    = tasaCump + '%';
+    document.getElementById('kpiCumplimientoBar').style.width = tasaCump + '%';
+
+    const promEspera=total>0?datosGlobales.reduce((s,d)=>s+(d.diasEspera||0),0)/total:0;
+    const promPlazo =total>0?datosGlobales.reduce((s,d)=>s+(d.diasPlazo||0),0)/total:0;
+    const eficiencia=promPlazo>0?Math.max(0,((1-promEspera/promPlazo)*100)).toFixed(1):0;
+    document.getElementById('kpiEficiencia').textContent    = eficiencia + '%';
+    document.getElementById('kpiEficienciaBar').style.width = eficiencia + '%';
+
+    const personas=[ ...new Set(datosGlobales.map(d=>d.Persona))].filter(Boolean);
+    document.getElementById('kpiCargaPromedio').textContent    = personas.length>0?(total/personas.length).toFixed(1):0;
+    document.getElementById('kpiClientesActivos').textContent  = [...new Set(datosGlobales.map(d=>d.Cliente))].filter(Boolean).length;
+    document.getElementById('kpiMetodos').textContent          = [...new Set(datosGlobales.map(d=>d.Metodo||d['Método']))].filter(Boolean).length;
+    document.getElementById('kpiTiempoRespuesta').textContent  = promPlazo.toFixed(1) + 'd';
+
+    // SLA by area
+    const areaMap = {};
+    datosGlobales.forEach(d=>{
+        const a=d.Area||'Sin area';
+        if(!areaMap[a]) areaMap[a]={total:0,enPlazo:0,vencidas:0,proximas:0,sumaEspera:0};
+        areaMap[a].total++;
+        areaMap[a].sumaEspera += (d.diasEspera||0);
+        if(d.estadoVencimiento==='ok')      areaMap[a].enPlazo++;
+        if(d.estadoVencimiento==='vencido') areaMap[a].vencidas++;
+        if(d.estadoVencimiento==='proximo') areaMap[a].proximas++;
+    });
+    const slaSorted=Object.entries(areaMap).sort((a,b)=>{
+        const pA=a[1].total>0?a[1].enPlazo/a[1].total:0;
+        const pB=b[1].total>0?b[1].enPlazo/b[1].total:0;
+        return pB-pA;
+    });
+    document.getElementById('slaAreaBody').innerHTML=slaSorted.map(([area,s])=>{
+        const pct=s.total>0?((s.enPlazo/s.total)*100).toFixed(1):0;
+        const pctNum=parseFloat(pct);
+        const pctCls=pctNum>=90?'bg-green-100 text-green-800':pctNum>=70?'bg-orange-100 text-orange-800':'bg-red-100 text-red-800';
+        const promEsp=s.total>0?(s.sumaEspera/s.total).toFixed(1):0;
+        return `<tr class="border-b hover:bg-muted/50 transition-colors" style="border-color:hsl(var(--border))">
+            <td class="px-4 py-3 text-sm font-medium">${area}</td>
+            <td class="px-4 py-3 text-sm">${s.total}</td>
+            <td class="px-4 py-3 text-sm text-green-700">${s.enPlazo}</td>
+            <td class="px-4 py-3 text-sm text-red-600">${s.vencidas}</td>
+            <td class="px-4 py-3 text-sm text-orange-600">${s.proximas}</td>
+            <td class="px-4 py-3"><span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${pctCls}">${pct}%</span></td>
+            <td class="px-4 py-3 text-sm">${promEsp}d</td>
+        </tr>`;
+    }).join('');
+
+    // Trends chart
+    const ctx=document.getElementById('trendsChart');
+    if(charts['trendsChart']) charts['trendsChart'].destroy();
+    charts['trendsChart']=new Chart(ctx,{type:'line',data:{labels:['Sem 1','Sem 2','Sem 3','Sem 4'],datasets:[{label:'Completadas',data:[45,52,48,61],borderColor:'hsl(142.1 76.2% 36.3%)',backgroundColor:'hsla(142.1,76.2%,36.3%,0.1)',tension:0.4},{label:'Vencidas',data:[8,5,7,4],borderColor:'hsl(0 84.2% 60.2%)',backgroundColor:'hsla(0,84.2%,60.2%,0.1)',tension:0.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true}}}});
+}
+
+// ─── Mi Dia ─────────────────────────────────────────────────────────────────
+function actualizarMiDia() {
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const tomorrow = new Date(hoy); tomorrow.setDate(tomorrow.getDate()+1);
+    const persona = personasActuales.length===1 ? personasActuales[0] : personasActuales.length>1 ? personasActuales.join(', ') : 'Analista';
+    document.getElementById('midia-fecha').textContent = hoy.toLocaleDateString('es-ES',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+    document.getElementById('midia-saludo').textContent = 'Hola, ' + persona + ' — aqui tienes tu dia';
+
+    const datos = datosGlobales;
+    const miniRow = (d, fechaKey, diasKey) => {
+        const dias = d[diasKey];
+        const fechaVal = d[fechaKey] ? formatFecha(d[fechaKey]) : '-';
+        const clr = dias !== null && dias < 0 ? 'color:hsl(var(--destructive))' : dias <= 3 ? 'color:hsl(24.6 95% 53.1%)' : '';
+        return `<tr class="border-b hover:bg-muted/50 cursor-pointer" style="border-color:hsl(var(--border))" onclick="abrirModal(${datos.indexOf(d)})">
+            <td class="px-3 py-2 text-sm font-medium whitespace-nowrap">${d.Muestra||'-'}</td>
+            <td class="px-3 py-2 text-sm" style="color:hsl(var(--muted-foreground))">${(d.Cliente||'-').substring(0,25)}</td>
+            <td class="px-3 py-2 text-sm whitespace-nowrap" style="color:hsl(var(--muted-foreground))">${fechaVal}</td>
+            <td class="px-3 py-2 text-sm font-semibold whitespace-nowrap" style="${clr}">${dias !== null ? dias+'d' : '-'}</td>
+            <td class="px-3 py-2 text-sm" style="color:hsl(var(--muted-foreground))">${d.Area||'-'}</td>
+        </tr>`;
+    };
+
+    const sections = [
+        { id:'midia-critico',  fn: d => d.estadoVencimiento==='vencido' || d.diasParaVencer===0,           fk:'F.Limite', dk:'diasParaVencer' },
+        { id:'midia-urgente',  fn: d => d.diasParaVencer>=1 && d.diasParaVencer<=3,                        fk:'F.Limite', dk:'diasParaVencer' },
+        { id:'midia-semana',   fn: d => d.diasParaVencer>=4 && d.diasParaVencer<=7,                        fk:'F.Limite', dk:'diasParaVencer' },
+        { id:'midia-caduc',    fn: d => d.estadoCaducidad==='proxima'||d.estadoCaducidad==='caducado',     fk:'F. Caduc', dk:'diasParaCaducar' },
+        { id:'midia-sinfirma', fn: d => !d.firmado,                                                        fk:'F.Limite', dk:'diasParaVencer' },
+        { id:'midia-finana',   fn: d => !d.finAnaCompleto,                                                 fk:'F.Limite', dk:'diasParaVencer' },
+    ];
+    sections.forEach(s => {
+        const arr = datos.filter(s.fn);
+        document.getElementById(s.id+'-count').textContent = arr.length;
+        document.getElementById(s.id+'-body').innerHTML = arr.slice(0,20).map(d=>miniRow(d,s.fk,s.dk)).join('') ||
+            '<tr><td colspan="5" class="px-3 py-4 text-sm text-center" style="color:hsl(var(--muted-foreground))">Sin registros</td></tr>';
+    });
+}
+
+// ─── Alertas Recientes ───────────────────────────────────────────────────────
+function actualizarAlertasRecientes() {
+    const alertas=datosGlobales.filter(d=>d.estadoVencimiento!=='ok').sort((a,b)=>a.diasParaVencer-b.diasParaVencer).slice(0,5);
+    document.getElementById('recentAlerts').innerHTML = alertas.map((d,i)=>`
+        <div class="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors" style="border-color:hsl(var(--border))" onclick="abrirModal(${datosGlobales.indexOf(d)})">
+            <div class="flex-1"><p class="text-sm font-medium">${d.Muestra} — ${d.Parametro||''}</p><p class="text-xs" style="color:hsl(var(--muted-foreground))">${(d.Cliente||'').substring(0,40)} · F.Limite: ${formatFecha(d['F.Limite']||d['F.Límite'])}</p></div>
+            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ml-3 ${estadoBadgeClass(d.estadoVencimiento)}">${estadoBadgeText(d.estadoVencimiento)}</span>
+        </div>
+    `).join('') || '<p class="text-sm" style="color:hsl(var(--muted-foreground))">Sin alertas activas.</p>';
+}
+
+// ─── Main Table ──────────────────────────────────────────────────────────────
+let tablaFiltradosCache = [];
+
+function getColVisible(id) {
+    const el = document.getElementById(id);
+    return el ? el.checked : true;
+}
+
+function actualizarColumnasVisibles() {
+    const toggleCols = ['col-matriz','col-codigo','col-metodo','col-diasplazo','col-frecepcion','col-progreso'];
+    toggleCols.forEach(id => {
+        const visible = getColVisible(id);
+        document.querySelectorAll(`[data-col-toggle="${id}"]`).forEach(el => {
+            el.style.display = visible ? '' : 'none';
+        });
+    });
+}
+
+function aplicarFiltrosTabla() {
+    if (!document.getElementById('filterArea')) return;
+    const area     = document.getElementById('filterArea').value;
+    const cliente  = document.getElementById('filterCliente').value;
+    const parametro= document.getElementById('filterParametro').value;
+    const estado   = document.getElementById('filterEstado').value;
+    const persona  = document.getElementById('filterPersona').value;
+    const busqueda = (document.getElementById('searchTable').value||'').toLowerCase();
+
+    let filtrados = [...datosGlobales];
+    if (area)      filtrados = filtrados.filter(d=>d.Area===area);
+    if (cliente)   filtrados = filtrados.filter(d=>d.Cliente===cliente);
+    if (parametro) filtrados = filtrados.filter(d=>d.Parametro===parametro);
+    if (estado)    filtrados = filtrados.filter(d=>d.estadoVencimiento===estado);
+    if (persona)   filtrados = filtrados.filter(d=>d.Persona===persona);
+    if (busqueda)  filtrados = filtrados.filter(d=>
+        String(d.Muestra||'').toLowerCase().includes(busqueda)||
+        String(d.Cliente||'').toLowerCase().includes(busqueda)||
+        String(d.Parametro||'').toLowerCase().includes(busqueda)||
+        String(d.Codigo||d['Código']||'').toLowerCase().includes(busqueda));
+
+    // Quick filter
+    const qf = quickFilterActivo;
+    if (qf === 'vencidas')  filtrados = filtrados.filter(d=>d.estadoVencimiento==='vencido');
+    else if (qf === 'proximas') filtrados = filtrados.filter(d=>d.estadoVencimiento==='proximo');
+    else if (qf === 'hoy')      filtrados = filtrados.filter(d=>d.diasParaVencer===0);
+    else if (qf === 'semana')   filtrados = filtrados.filter(d=>d.diasParaVencer>=0&&d.diasParaVencer<=7);
+    else if (qf === 'sinfirma') filtrados = filtrados.filter(d=>!d.firmado);
+    else if (qf === 'finana')   filtrados = filtrados.filter(d=>!d.finAnaCompleto);
+    else if (qf === 'enplazo')  filtrados = filtrados.filter(d=>d.estadoVencimiento==='ok');
+
+    // Ribbon filter
+    const rf = ribbonFilterActivo;
+    if (rf === 'vencido')  filtrados = filtrados.filter(d=>d.estadoVencimiento==='vencido');
+    else if (rf === 'proximo') filtrados = filtrados.filter(d=>d.estadoVencimiento==='proximo');
+    else if (rf === 'ok')      filtrados = filtrados.filter(d=>d.estadoVencimiento==='ok');
+    else if (rf === 'caduc')   filtrados = filtrados.filter(d=>d.estadoCaducidad==='proxima'||d.estadoCaducidad==='caducado');
+    else if (rf === 'sinfirma') filtrados = filtrados.filter(d=>!d.firmado);
+
+    // Sort
+    if (tablaOrden.col) {
+        const numCols=['diasEspera','diasPlazo','diasParaVencer','pctPlazo'];
+        filtrados.sort((a,b)=>{
+            let va=a[tablaOrden.col]??'', vb=b[tablaOrden.col]??'';
+            if(numCols.includes(tablaOrden.col)) return tablaOrden.dir==='asc'?(va-vb):(vb-va);
+            return tablaOrden.dir==='asc'?String(va).localeCompare(String(vb),'es'):String(vb).localeCompare(String(va),'es');
+        });
+    }
+
+    // Sort indicators
+    document.querySelectorAll('#tablaPrincipal-head .sort-indicator').forEach(el=>el.textContent='');
+    if (tablaOrden.col) {
+        const th=document.querySelector(`#tablaPrincipal-head th[data-col="${tablaOrden.col}"]`);
+        if(th) th.querySelector('.sort-indicator').textContent=tablaOrden.dir==='asc'?'\u2191':'\u2193';
+    }
+
+    tablaFiltradosCache = filtrados;
+    paginaActual = 1;
+    renderPagina();
+    actualizarColumnasVisibles();
+
+    const count=document.getElementById('tablaCount');
+    if(count) count.textContent=filtrados.length+' de '+datosGlobales.length;
+}
+
+function renderPagina() {
+    const filtrados = tablaFiltradosCache;
+    const totalPages = Math.max(1, Math.ceil(filtrados.length / FILAS_PAGINA));
+    if (paginaActual > totalPages) paginaActual = totalPages;
+    const start = (paginaActual-1)*FILAS_PAGINA;
+    const paginados = filtrados.slice(start, start+FILAS_PAGINA);
+
+    const showFrec   = getColVisible('col-frecepcion');
+    const showMatriz = getColVisible('col-matriz');
+    const showCodigo = getColVisible('col-codigo');
+    const showMetodo = getColVisible('col-metodo');
+    const showPlazo  = getColVisible('col-diasplazo');
+    const showProg   = getColVisible('col-progreso');
+
+    document.getElementById('tablaPrincipal').innerHTML = paginados.map((d,i) => {
+        const idx = datosGlobales.indexOf(d);
+        const progColor = d.pctPlazo > 100 ? '#ef4444' : d.pctPlazo > 75 ? '#f97316' : d.pctPlazo > 50 ? '#eab308' : '#22c55e';
+        const progPct   = Math.min(d.pctPlazo, 100);
+        const progBar   = `<div class="progress-wrap"><div class="progress-fill" style="width:${progPct}%;background:${progColor}"></div></div>`;
+        return `<tr class="border-b hover:bg-muted/50 cursor-pointer transition-colors" style="border-color:hsl(var(--border))" onclick="abrirModal(${idx})">
+            <td class="p-3 text-sm font-medium whitespace-nowrap">${d.Muestra||'-'}</td>
+            ${showFrec  ?`<td class="p-3 text-sm whitespace-nowrap" style="color:hsl(var(--muted-foreground))" data-col-toggle="col-frecepcion">${formatFecha(d['F. Recepcion']||d['F. Recepción'])}</td>`:''}
+            <td class="p-3 text-sm" style="color:hsl(var(--muted-foreground))">${(d.Cliente||'-').substring(0,25)}</td>
+            ${showMatriz?`<td class="p-3 text-sm" style="color:hsl(var(--muted-foreground))" data-col-toggle="col-matriz">${d.Matriz||'-'}</td>`:''}
+            <td class="p-3 text-sm" style="color:hsl(var(--muted-foreground))">${(d.Parametro||'-').substring(0,28)}</td>
+            ${showCodigo?`<td class="p-3 text-sm whitespace-nowrap" style="color:hsl(var(--muted-foreground))" data-col-toggle="col-codigo">${d.Codigo||d['Código']||'-'}</td>`:''}
+            <td class="p-3 text-sm whitespace-nowrap" style="color:hsl(var(--muted-foreground))">${formatFecha(d['F.Limite']||d['F.Límite'])}</td>
+            <td class="p-3 text-sm" style="color:hsl(var(--muted-foreground))">${d.Area||'-'}</td>
+            ${showMetodo?`<td class="p-3 text-sm" style="color:hsl(var(--muted-foreground))" data-col-toggle="col-metodo">${(d.Metodo||d['Método']||'-').substring(0,22)}</td>`:''}
+            <td class="p-3 text-sm whitespace-nowrap" style="color:hsl(var(--muted-foreground))">${d.Persona||'-'}</td>
+            <td class="p-3 text-sm text-right">${d.diasEspera}</td>
+            ${showPlazo ?`<td class="p-3 text-sm text-right" style="color:hsl(var(--muted-foreground))" data-col-toggle="col-diasplazo">${d.diasPlazo}</td>`:''}
+            <td class="p-3"><span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${estadoBadgeClass(d.estadoVencimiento)}">${estadoBadgeText(d.estadoVencimiento)}</span></td>
+            ${showProg  ?`<td class="p-3" data-col-toggle="col-progreso">${progBar} <span class="text-xs ml-1" style="color:hsl(var(--muted-foreground))">${d.pctPlazo}%</span></td>`:''}
+        </tr>`;
+    }).join('');
+
+    const info=document.getElementById('paginaInfo');
+    if(info) info.textContent=`Pagina ${paginaActual} de ${totalPages} (${filtrados.length} filas)`;
+}
+
+function cambiarPagina(dir) {
+    const totalPages=Math.max(1,Math.ceil(tablaFiltradosCache.length/FILAS_PAGINA));
+    paginaActual=Math.max(1,Math.min(totalPages,paginaActual+dir));
+    renderPagina();
+}
+
+function ordenarTabla(col) {
+    tablaOrden.dir = tablaOrden.col===col && tablaOrden.dir==='asc' ? 'desc' : 'asc';
+    tablaOrden.col = col;
+    aplicarFiltrosTabla();
+}
+
+function setQuickFilter(val) {
+    quickFilterActivo = val;
+    document.querySelectorAll('[id^="chip-"]').forEach(el=>el.classList.remove('active'));
+    const chipMap={vencidas:'chip-vencidas',proximas:'chip-proximas',hoy:'chip-hoy',semana:'chip-semana',sinfirma:'chip-sinfirma',finana:'chip-finana',enplazo:'chip-enplazo'};
+    if(val && chipMap[val]) document.getElementById(chipMap[val]).classList.add('active');
+    aplicarFiltrosTabla();
+}
+
+function toggleColMenu() {
+    document.getElementById('colToggleMenu').classList.toggle('open');
+}
+
+function actualizarTablaPrincipal() {
+    aplicarFiltrosTabla();
+    if (!filtrosListenersAttached) {
+        ['filterArea','filterCliente','filterParametro','filterEstado','filterPersona'].forEach(id=>{
+            const el=document.getElementById(id); if(el) el.addEventListener('change',aplicarFiltrosTabla);
+        });
+        const st=document.getElementById('searchTable'); if(st) st.addEventListener('input',aplicarFiltrosTabla);
+        document.addEventListener('click', e=>{
+            const cm=document.getElementById('colToggleMenu');
+            if(cm && !cm.parentElement.contains(e.target)) cm.classList.remove('open');
+            const em=document.getElementById('exportMenu');
+            const ed=document.getElementById('exportDropdown');
+            if(em && ed && !ed.contains(e.target)) em.classList.add('hidden');
+            const pm=document.getElementById('personalDropdownMenu');
+            const pw=document.getElementById('personalDropdownWrap');
+            if(pm && pw && !pw.contains(e.target)) pm.classList.add('hidden');
+        });
+        filtrosListenersAttached = true;
+    }
+}
+
+// ─── Filtros Dropdown Populate ───────────────────────────────────────────────
+function poblarFiltros() {
+    const areas    =[...new Set(datosOriginales.map(d=>d.Area))].filter(Boolean).sort();
+    const clientes =[...new Set(datosOriginales.map(d=>d.Cliente))].filter(Boolean).sort();
+    const personas =[...new Set(datosOriginales.map(d=>d.Persona))].filter(Boolean).sort();
+    const params   =[...new Set(datosOriginales.map(d=>d.Parametro))].filter(Boolean).sort();
+    const setOpts=(id,vals,prefix)=>{
+        const el=document.getElementById(id); if(!el) return;
+        el.innerHTML=`<option value="">${prefix}</option>`+vals.map(v=>`<option value="${v}">${String(v).substring(0,50)}</option>`).join('');
+    };
+    setOpts('filterArea',     areas,    'Todas las areas');
+    setOpts('filterCliente',  clientes, 'Todos los clientes');
+    setOpts('filterPersona',  personas, 'Todas las personas');
+    setOpts('filterParametro',params,   'Todos los parametros');
+}
+
+// ─── Alertas Table ───────────────────────────────────────────────────────────
+let alertTabActivo = 'atab-plazo';
+function switchAlertTab(tabId) {
+    alertTabActivo = tabId;
+    document.querySelectorAll('.alert-tab').forEach(t=>t.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    ['apanel-plazo','apanel-caduc','apanel-firma','apanel-finana'].forEach(p=>{
+        const el=document.getElementById(p); if(el) el.classList.add('hidden');
+    });
+    const panelMap={'atab-plazo':'apanel-plazo','atab-caduc':'apanel-caduc','atab-firma':'apanel-firma','atab-finana':'apanel-finana'};
+    const panel=document.getElementById(panelMap[tabId]); if(panel) panel.classList.remove('hidden');
+}
+
+function actualizarTablaAlertas() {
+    const plazoDatos  = datosGlobales.filter(d=>d.estadoVencimiento!=='ok').sort((a,b)=>a.diasParaVencer-b.diasParaVencer);
+    const caducDatos  = datosGlobales.filter(d=>d.estadoCaducidad==='caducado'||d.estadoCaducidad==='proxima').sort((a,b)=>(a.diasParaCaducar??9999)-(b.diasParaCaducar??9999));
+    const firmaDatos  = datosGlobales.filter(d=>!d.firmado);
+    const finanaDatos = datosGlobales.filter(d=>!d.finAnaCompleto);
+
+    document.getElementById('atab-plazo-count').textContent  = plazoDatos.length;
+    document.getElementById('atab-caduc-count').textContent  = caducDatos.length;
+    document.getElementById('atab-firma-count').textContent  = firmaDatos.length;
+    document.getElementById('atab-finana-count').textContent = finanaDatos.length;
+
+    const alertRow=(d,cols)=>{
+        const idx=datosGlobales.indexOf(d);
+        const tds=cols.map(c=>`<td class="p-3 text-sm whitespace-nowrap" style="color:hsl(var(--muted-foreground))">${c}</td>`).join('');
+        return `<tr class="border-b hover:bg-muted/50 cursor-pointer transition-colors" style="border-color:hsl(var(--border))" onclick="abrirModal(${idx})">${tds}</tr>`;
+    };
+
+    document.getElementById('apanel-plazo-body').innerHTML = plazoDatos.map(d=>alertRow(d,[
+        `<span class="font-medium" style="color:hsl(var(--foreground))">${d.Muestra||'-'}</span>`,
+        formatFecha(d['F.Limite']||d['F.Límite']),
+        (d.Cliente||'-').substring(0,25),(d.Parametro||'-').substring(0,25),d.Area||'-',
+        `<span class="font-semibold" style="color:${d.diasParaVencer<0?'hsl(var(--destructive))':'hsl(24.6 95% 53.1%)'}">${d.diasParaVencer}d</span>`,
+        d.Persona||'-',
+        `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${estadoBadgeClass(d.estadoVencimiento)}">${estadoBadgeText(d.estadoVencimiento)}</span>`
+    ])).join('') || emptyRow(8);
+
+    document.getElementById('apanel-caduc-body').innerHTML = caducDatos.map(d=>alertRow(d,[
+        `<span class="font-medium" style="color:hsl(var(--foreground))">${d.Muestra||'-'}</span>`,
+        formatFecha(d['F. Caduc']),(d.Cliente||'-').substring(0,25),(d.Parametro||'-').substring(0,25),d.Area||'-',
+        `<span class="font-semibold" style="color:${(d.diasParaCaducar??0)<0?'hsl(var(--destructive))':'hsl(24.6 95% 53.1%)'}">${d.diasParaCaducar??'-'}d</span>`,
+        d.Persona||'-',
+        `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${d.estadoCaducidad==='caducado'?'bg-red-100 text-red-800':'bg-orange-100 text-orange-800'}">${d.estadoCaducidad==='caducado'?'Caducado':'Prox. caducar'}</span>`
+    ])).join('') || emptyRow(8);
+
+    document.getElementById('apanel-firma-body').innerHTML = firmaDatos.map(d=>alertRow(d,[
+        `<span class="font-medium" style="color:hsl(var(--foreground))">${d.Muestra||'-'}</span>`,
+        formatFecha(d['F.Limite']||d['F.Límite']),(d.Cliente||'-').substring(0,25),(d.Parametro||'-').substring(0,25),d.Area||'-',
+        d.diasEspera+'d',d.Persona||'-',
+        `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-orange-100 text-orange-800">Sin firma</span>`
+    ])).join('') || emptyRow(8);
+
+    document.getElementById('apanel-finana-body').innerHTML = finanaDatos.map(d=>alertRow(d,[
+        `<span class="font-medium" style="color:hsl(var(--foreground))">${d.Muestra||'-'}</span>`,
+        formatFecha(d['F.Limite']||d['F.Límite']),(d.Cliente||'-').substring(0,25),(d.Parametro||'-').substring(0,25),d.Area||'-',
+        d.diasEspera+'d',d.Persona||'-',
+        `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800">Sin FinAna</span>`
+    ])).join('') || emptyRow(8);
+}
+
+function emptyRow(cols) {
+    return `<tr><td colspan="${cols}" class="px-4 py-8 text-center text-sm" style="color:hsl(var(--muted-foreground))">Sin registros</td></tr>`;
+}
+
+// ─── Analisis Avanzado ───────────────────────────────────────────────────────
+function actualizarAnalisisAvanzado() {
+    const vencidas=datosGlobales.filter(d=>d.estadoVencimiento==='vencido').length;
+    const proximas=datosGlobales.filter(d=>d.estadoVencimiento==='proximo').length;
+    const enPlazo =datosGlobales.filter(d=>d.estadoVencimiento==='ok').length;
+    document.getElementById('analisisPrioridad').innerHTML=`
+        <div class="flex items-center justify-between p-3 rounded-lg" style="background:hsla(0,84%,60%,.1)">
+            <div><p class="text-sm font-medium">Alta prioridad</p><p class="text-xs" style="color:hsl(var(--muted-foreground))">Vencidas</p></div>
+            <div class="text-2xl font-bold" style="color:hsl(var(--destructive))">${vencidas}</div>
+        </div>
+        <div class="flex items-center justify-between p-3 rounded-lg" style="background:hsla(25,95%,53%,.1)">
+            <div><p class="text-sm font-medium">Media prioridad</p><p class="text-xs" style="color:hsl(var(--muted-foreground))">Proximas a vencer</p></div>
+            <div class="text-2xl font-bold text-orange-600">${proximas}</div>
+        </div>
+        <div class="flex items-center justify-between p-3 rounded-lg" style="background:hsla(142,76%,36%,.1)">
+            <div><p class="text-sm font-medium">Baja prioridad</p><p class="text-xs" style="color:hsl(var(--muted-foreground))">En plazo</p></div>
+            <div class="text-2xl font-bold text-green-600">${enPlazo}</div>
+        </div>`;
+    const pc={};
+    datosGlobales.forEach(d=>{ const p=d.Parametro||'Sin parametro'; pc[p]=(pc[p]||0)+1; });
+    const topP=Object.entries(pc).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    crearGrafico('parametrosChart','bar',topP.map(p=>p[0]),topP.map(p=>p[1]),['hsl(222.2 47.4% 11.2%)']);
+
+    const ctx=document.getElementById('plazosChart');
+    if(charts['plazosChart']) charts['plazosChart'].destroy();
+    charts['plazosChart']=new Chart(ctx,{type:'scatter',data:{datasets:[{label:'Dias Espera vs Dias Plazo',data:datosGlobales.map(d=>({x:d.diasPlazo,y:d.diasEspera})),backgroundColor:datosGlobales.map(d=>d.estadoVencimiento==='vencido'?'hsla(0,84%,60%,.65)':d.estadoVencimiento==='proximo'?'hsla(25,95%,53%,.65)':'hsla(142,76%,36%,.65)'),pointRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true}},scales:{x:{title:{display:true,text:'Dias de Plazo (F.Rec -> F.Limite)'},beginAtZero:true},y:{title:{display:true,text:'Dias de Espera (F.Rec -> Hoy)'},beginAtZero:true}}}});
+}
+
+// ─── Equipo ──────────────────────────────────────────────────────────────────
+function actualizarCargaTrabajo() {
+    const carga={};
+    datosGlobales.forEach(d=>{
+        const p=d.Persona||'Sin asignar';
+        if(!carga[p]) carga[p]={total:0,vencidas:0,proximas:0,sumaEspera:0,sumaPlazo:0};
+        carga[p].total++;
+        carga[p].sumaEspera+=(d.diasEspera||0);
+        carga[p].sumaPlazo+=(d.diasPlazo||0);
+        if(d.estadoVencimiento==='vencido') carga[p].vencidas++;
+        if(d.estadoVencimiento==='proximo') carga[p].proximas++;
+    });
+    const maxCarga=Math.max(...Object.values(carga).map(c=>c.total),1);
+    document.getElementById('cargaPersonaBody').innerHTML=Object.entries(carga).sort((a,b)=>b[1].total-a[1].total).map(([persona,c])=>{
+        const rend=(((c.total-c.vencidas)/c.total)*100).toFixed(0);
+        const rendCls=rend>=90?'bg-green-100 text-green-800':rend>=70?'bg-orange-100 text-orange-800':'bg-red-100 text-red-800';
+        return `<tr class="border-b hover:bg-muted/50 transition-colors" style="border-color:hsl(var(--border))">
+            <td class="p-4 text-sm font-medium">${persona}</td>
+            <td class="p-4 text-sm">${c.total}</td>
+            <td class="p-4 text-sm font-semibold" style="color:hsl(var(--destructive))">${c.vencidas}</td>
+            <td class="p-4 text-sm font-semibold text-orange-600">${c.proximas}</td>
+            <td class="p-4"><span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${rendCls}">${rend}%</span></td>
+            <td class="p-4"><div class="w-full rounded-full h-2" style="background:hsl(var(--secondary))"><div class="rounded-full h-full" style="background:hsl(var(--primary));width:${(c.total/maxCarga)*100}%"></div></div></td>
+        </tr>`;
+    }).join('');
+}
+
+function actualizarGraficoEquipo() {
+    const ctx=document.getElementById('cargaEquipoChart');
+    if(charts['cargaEquipoChart']) charts['cargaEquipoChart'].destroy();
+    const carga={};
+    datosGlobales.forEach(d=>{
+        const p=d.Persona||'Sin asignar';
+        if(!carga[p]) carga[p]={ok:0,proximas:0,vencidas:0};
+        if(d.estadoVencimiento==='vencido') carga[p].vencidas++;
+        else if(d.estadoVencimiento==='proximo') carga[p].proximas++;
+        else carga[p].ok++;
+    });
+    const personas=Object.keys(carga).sort((a,b)=>(carga[b].ok+carga[b].proximas+carga[b].vencidas)-(carga[a].ok+carga[a].proximas+carga[a].vencidas)).slice(0,10);
+    charts['cargaEquipoChart']=new Chart(ctx,{type:'bar',data:{labels:personas,datasets:[{label:'En plazo',data:personas.map(p=>carga[p].ok),backgroundColor:'hsl(142.1 76.2% 36.3%)'},{label:'Proximas',data:personas.map(p=>carga[p].proximas),backgroundColor:'hsl(24.6 95% 53.1%)'},{label:'Vencidas',data:personas.map(p=>carga[p].vencidas),backgroundColor:'hsl(0 84.2% 60.2%)'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
+}
+
+function actualizarHeatmap() {
+    const carga={};
+    datosGlobales.forEach(d=>{
+        const p=d.Persona||'Sin asignar';
+        if(!carga[p]) carga[p]={total:0,vencidas:0,sumaEspera:0,sumaPlazo:0};
+        carga[p].total++;
+        carga[p].sumaEspera+=(d.diasEspera||0);
+        carga[p].sumaPlazo+=(d.diasPlazo||0);
+        if(d.estadoVencimiento==='vencido') carga[p].vencidas++;
+    });
+    const maxTotal=Math.max(...Object.values(carga).map(c=>c.total),1);
+    document.getElementById('heatmapContainer').innerHTML=Object.entries(carga).sort((a,b)=>b[1].total-a[1].total).map(([persona,c])=>{
+        const vPct=c.total>0?((c.vencidas/c.total)*100).toFixed(0):0;
+        const vClr=vPct>20?'background:#fecaca;color:#991b1b':vPct>10?'background:#fed7aa;color:#9a3412':'background:#bbf7d0;color:#166534';
+        const promEsp=c.total>0?(c.sumaEspera/c.total).toFixed(1):0;
+        const promPl=c.total>0?(c.sumaPlazo/c.total).toFixed(1):0;
+        const efPct=promPl>0?Math.max(0,((1-promEsp/promPl)*100)).toFixed(0):0;
+        const efClr=efPct>70?'background:#bbf7d0;color:#166534':efPct>40?'background:#fed7aa;color:#9a3412':'background:#fecaca;color:#991b1b';
+        const loadPct=((c.total/maxTotal)*100).toFixed(0);
+        const loadClr=loadPct>70?'background:#bfdbfe;color:#1e40af':loadPct>40?'background:#ddd6fe;color:#5b21b6':'background:#e0f2fe;color:#0369a1';
+        return `<div class="flex items-center gap-3 py-2 border-b" style="border-color:hsl(var(--border))">
+            <span class="text-sm font-medium w-32 truncate flex-shrink-0">${persona}</span>
+            <span class="hm-cell" style="${vClr}">Venc. ${vPct}%</span>
+            <span class="hm-cell" style="${efClr}">Efic. ${efPct}%</span>
+            <span class="hm-cell" style="${loadClr}">Carga ${c.total}</span>
+        </div>`;
+    }).join('');
+}
+
+// ─── Detail Modal ────────────────────────────────────────────────────────────
+function abrirModal(idx) {
+    const d = datosGlobales[idx];
+    if (!d) return;
+    const progColor = d.pctPlazo > 100 ? '#ef4444' : d.pctPlazo > 75 ? '#f97316' : d.pctPlazo > 50 ? '#eab308' : '#22c55e';
+    const progPct   = Math.min(d.pctPlazo, 100);
+    const sec = (title, rows) => `
+        <div class="mb-5">
+            <h3 class="text-xs font-semibold uppercase tracking-wide mb-3 pb-1 border-b" style="color:hsl(var(--muted-foreground));border-color:hsl(var(--border))">${title}</h3>
+            <div class="grid grid-cols-2 gap-3">${rows.map(([l,v])=>`<div><p class="text-xs" style="color:hsl(var(--muted-foreground))">${l}</p><p class="text-sm font-medium mt-0.5">${v||'-'}</p></div>`).join('')}</div>
+        </div>`;
+    document.getElementById('modalContent').innerHTML = `
+        ${sec('Identificacion',[['Muestra',d.Muestra],['Codigo',d.Codigo||d['Código']],['Cliente',d.Cliente],['Matriz',d.Matriz]])}
+        ${sec('Fechas',[['F. Recepcion',formatFecha(d['F. Recepcion']||d['F. Recepción'])],['F.Limite',formatFecha(d['F.Limite']||d['F.Límite'])],['F. Caduc',formatFecha(d['F. Caduc'])],['F. Max',formatFecha(d['F. Max'])],['Min',d.Min]])}
+        ${sec('Analisis',[['Parametro',d.Parametro],['Metodo',d.Metodo||d['Método']],['Area',d.Area],['Conductivid',d.Conductivid],['CECO',d.ceco]])}
+        ${sec('Estado',[['Estado (Excel)',d.Estado],['Firma',d.Firma||'(vacio)'],['FinAna',d.FinAna||'(vacio)'],['Intro',d.Intro],['Persona',d.Persona]])}
+        <div class="rounded-lg p-4 mb-2" style="background:hsl(var(--muted))">
+            <h3 class="text-xs font-semibold uppercase tracking-wide mb-3" style="color:hsl(var(--muted-foreground))">Calculado</h3>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div><p class="text-xs" style="color:hsl(var(--muted-foreground))">Dias Espera</p><p class="text-sm font-bold">${d.diasEspera}d</p></div>
+                <div><p class="text-xs" style="color:hsl(var(--muted-foreground))">Dias Plazo</p><p class="text-sm font-bold">${d.diasPlazo}d</p></div>
+                <div><p class="text-xs" style="color:hsl(var(--muted-foreground))">% Plazo Elapsed</p><p class="text-sm font-bold">${d.pctPlazo}%</p></div>
+                <div><p class="text-xs" style="color:hsl(var(--muted-foreground))">Dias para Vencer</p><p class="text-sm font-bold" style="color:${d.diasParaVencer<0?'hsl(var(--destructive))':'inherit'}">${d.diasParaVencer}d</p></div>
+                <div><p class="text-xs" style="color:hsl(var(--muted-foreground))">Estado Vencimiento</p><p class="text-sm"><span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${estadoBadgeClass(d.estadoVencimiento)}">${estadoBadgeText(d.estadoVencimiento)}</span></p></div>
+                <div><p class="text-xs" style="color:hsl(var(--muted-foreground))">Estado Caducidad</p><p class="text-sm"><span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${d.estadoCaducidad==='caducado'?'bg-red-100 text-red-800':d.estadoCaducidad==='proxima'?'bg-orange-100 text-orange-800':'bg-green-100 text-green-800'}">${d.estadoCaducidad}</span></p></div>
+            </div>
+            <p class="text-xs mb-1" style="color:hsl(var(--muted-foreground))">Progreso del plazo: ${d.pctPlazo}%</p>
+            <div class="w-full h-3 rounded-full overflow-hidden" style="background:hsl(var(--border))">
+                <div class="h-full rounded-full transition-all" style="width:${progPct}%;background:${progColor}"></div>
+            </div>
+        </div>`;
+    document.getElementById('detailModal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+function cerrarModal() {
+    document.getElementById('detailModal').classList.remove('open');
+    document.body.style.overflow = '';
+}
+function handleModalClick(e) {
+    if (e.target === e.currentTarget || e.target.classList.contains('modal-backdrop')) cerrarModal();
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') cerrarModal(); });
+
+// ─── Badge Helpers ───────────────────────────────────────────────────────────
+function estadoBadgeClass(e) {
+    return e==='vencido'?'bg-red-100 text-red-800':e==='proximo'?'bg-orange-100 text-orange-800':'bg-green-100 text-green-800';
+}
+function estadoBadgeText(e) {
+    return e==='vencido'?'Vencido':e==='proximo'?'Proximo':'En plazo';
+}
+
+// ─── Export ──────────────────────────────────────────────────────────────────
+function toggleExportMenu() { document.getElementById('exportMenu').classList.toggle('hidden'); }
+function exportarDatos(tipo) {
+    document.getElementById('exportMenu').classList.add('hidden');
+    const fecha=new Date().toISOString().split('T')[0];
+    let datos, nombre;
+    if(tipo==='todo')     { if(!datosOriginales.length){mostrarToast('Sin datos','warning');return;} datos=datosOriginales; nombre=`lab_completo_${fecha}.xlsx`; }
+    else if(tipo==='personal') { if(!datosGlobales.length){mostrarToast('Sin datos','warning');return;} datos=datosGlobales; nombre=`lab_${(personasActuales.length===1?personasActuales[0]:areaActual||'filtrado').replace(/\s+/g,'_')}_${fecha}.xlsx`; }
+    else if(tipo==='alertas')  { datos=datosGlobales.filter(d=>d.estadoVencimiento!=='ok'); if(!datos.length){mostrarToast('Sin alertas','warning');return;} nombre=`alertas_${fecha}.xlsx`; }
+    else return;
+    const exportData=datos.map(d=>({'Muestra':d.Muestra,'F. Recepcion':d['F. Recepcion']||d['F. Recepción'],'Cliente':d.Cliente,'Matriz':d.Matriz,'Parametro':d.Parametro,'Codigo':d.Codigo||d['Código'],'F.Limite':d['F.Limite']||d['F.Límite'],'Area':d.Area,'Metodo':d.Metodo||d['Método'],'Persona':d.Persona,'F. Caduc':d['F. Caduc'],'Conductivid':d.Conductivid,'Estado':d.Estado,'Firma':d.Firma,'FinAna':d.FinAna,'ceco':d.ceco,'Dias Espera':d.diasEspera,'Dias Plazo':d.diasPlazo,'Dias para Vencer':d.diasParaVencer,'% Plazo':d.pctPlazo,'Estado Vencimiento':estadoBadgeText(d.estadoVencimiento)}));
+    const ws=XLSX.utils.json_to_sheet(exportData);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Datos');
+    XLSX.writeFile(wb,nombre);
+    mostrarToast('Exportado: '+nombre,'success');
+}
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+function mostrarToast(mensaje, tipo='info') {
+    const container=document.getElementById('toastContainer'); if(!container) return;
+    const iconos={success:'<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>',error:'<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>',warning:'<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>',info:'<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'};
+    const colores={success:'background:#f0fdf4;border:1px solid #bbf7d0;color:#166534',error:'background:#fef2f2;border:1px solid #fecaca;color:#991b1b',warning:'background:#fff7ed;border:1px solid #fed7aa;color:#9a3412',info:'background:hsl(var(--secondary));border:1px solid hsl(var(--border));color:hsl(var(--foreground))'};
+    const toast=document.createElement('div');
+    toast.className='toast flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-md text-sm font-medium';
+    toast.style.cssText=colores[tipo]||colores.info;
+    toast.innerHTML=(iconos[tipo]||iconos.info)+'<span>'+mensaje+'</span>';
+    container.appendChild(toast);
+    requestAnimationFrame(()=>toast.classList.add('show'));
+    setTimeout(()=>{ toast.classList.remove('show'); toast.classList.add('hide'); setTimeout(()=>toast.remove(),300); },3500);
+}
+
+// ─── localStorage ────────────────────────────────────────────────────────────
+function guardarEnLocalStorage(rawData) {
+    try {
+        localStorage.setItem(LS_RAW, JSON.stringify(rawData));
+        localStorage.setItem(LS_META, JSON.stringify({fecha:new Date().toLocaleString('es-ES'),total:rawData.length}));
+    } catch(e) { console.warn('localStorage no disponible:', e); }
+}
+function cargarDesdeLocalStorage() {
+    try {
+        const raw=localStorage.getItem(LS_RAW); if(!raw) return false;
+        const meta=JSON.parse(localStorage.getItem(LS_META)||'{}');
+        const rawData=JSON.parse(raw);
+        datosOriginales=procesarDatos(rawData);
+        datosGlobales=[...datosOriginales];
+        document.getElementById('uploadSection').classList.add('hidden');
+        document.getElementById('dashboardContent').classList.remove('hidden');
+        document.getElementById('lastUpdate').textContent=meta.fecha||'-';
+        document.getElementById('btnNuevoArchivo').classList.remove('hidden');
+        poblarAreas(); poblarPuestosTrabajo();
+        actualizarDashboard();
+        mostrarToast('Sesion restaurada — '+datosOriginales.length+' muestras','info');
+        return true;
+    } catch(e) {
+        localStorage.removeItem(LS_RAW); localStorage.removeItem(LS_META); return false;
+    }
+}
+function limpiarDatos() {
+    localStorage.removeItem(LS_RAW); localStorage.removeItem(LS_META);
+    datosGlobales=[]; datosOriginales=[];
+    Object.values(charts).forEach(c=>{ try{c.destroy();}catch(_){} });
+    charts={}; filtrosListenersAttached=false; tablaOrden={col:null,dir:'asc'};
+    personasActuales=[]; areaActual=''; quickFilterActivo=''; ribbonFilterActivo='';
+    document.getElementById('dashboardContent').classList.add('hidden');
+    document.getElementById('uploadSection').classList.remove('hidden');
+    document.getElementById('btnNuevoArchivo').classList.add('hidden');
+    document.getElementById('lastUpdate').textContent='-';
+    document.getElementById('fileInput').value='';
+    document.getElementById('statsRibbon').classList.remove('visible');
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+initDarkMode();
+cargarDesdeLocalStorage();
+
+</script>
+</body>
+</html>
