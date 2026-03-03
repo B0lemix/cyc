@@ -715,6 +715,10 @@ html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));co
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
     </button>
     <button onclick="calNavMes(0)" class="chip ml-1">Hoy</button>
+    <div class="flex items-center gap-1 ml-3 rounded-md p-0.5" style="background:hsl(var(--muted))">
+      <button data-modo="muestras" class="cal-modo-chip chip chip-active text-xs" onclick="setCalModo('muestras')">Muestras</button>
+      <button data-modo="parametros" class="cal-modo-chip chip text-xs" onclick="setCalModo('parametros')">Par&aacute;metros</button>
+    </div>
     <p class="text-xs ml-auto" style="color:hsl(var(--muted-foreground))">Basado en F. Recepcion &middot; Click en un dia para ver detalle</p>
   </div>
 
@@ -1795,6 +1799,28 @@ function limpiarDatos() {
 // ─── Calendario / Recepcion por Fechas ───────────────────────────────────────
 let calFechaMes = new Date();
 calFechaMes.setDate(1);
+let calModo = 'muestras'; // 'muestras' | 'parametros'
+
+function setCalModo(modo) {
+    calModo = modo;
+    document.querySelectorAll('.cal-modo-chip').forEach(el => {
+        const active = el.dataset.modo === modo;
+        el.classList.toggle('chip-active', active);
+    });
+    actualizarCalendario();
+}
+
+// Devuelve el conteo activo segun calModo para un array de indices
+function _calCount(idxs) {
+    if (calModo === 'muestras') {
+        return new Set(idxs.map(i => datosGlobales[i].Muestra || i)).size;
+    }
+    return idxs.length;
+}
+// Devuelve el conteo de muestras unicas independientemente del modo
+function _calMuestras(idxs) {
+    return new Set(idxs.map(i => datosGlobales[i].Muestra || i)).size;
+}
 
 function calNavMes(dir) {
     if (dir === 0) { calFechaMes = new Date(); calFechaMes.setDate(1); }
@@ -1825,11 +1851,11 @@ function renderCalMes(recMap) {
                    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     document.getElementById('cal-mes-label').textContent = MESES[mes] + ' ' + año;
 
-    // Max para escala de color (solo el mes actual)
+    // Max para escala de color (solo el mes actual, segun modo activo)
     let maxCount = 1;
     for (let d = 1; d <= new Date(año, mes+1, 0).getDate(); d++) {
         const key = año+'-'+String(mes+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-        if (recMap[key]) maxCount = Math.max(maxCount, recMap[key].length);
+        if (recMap[key]) maxCount = Math.max(maxCount, _calCount(recMap[key]));
     }
 
     const hoy = new Date(); hoy.setHours(0,0,0,0);
@@ -1842,8 +1868,12 @@ function renderCalMes(recMap) {
 
     for (let dia = 1; dia <= diasEnMes; dia++) {
         const key   = año+'-'+String(mes+1).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
-        const idxs  = recMap[key] || [];
-        const count = idxs.length;
+        const idxs     = recMap[key] || [];
+        const count    = _calCount(idxs);          // primario (segun modo)
+        const nMues    = _calMuestras(idxs);        // siempre muestras unicas
+        const nParams  = idxs.length;               // siempre total parametros
+        const secondary = calModo === 'muestras' ? nParams : nMues; // el otro numero
+        const secLabel  = calModo === 'muestras' ? 'p' : 'm';
         const fecha = new Date(año, mes, dia);
         const isHoy = fecha.getTime() === hoy.getTime();
 
@@ -1856,15 +1886,17 @@ function renderCalMes(recMap) {
             else if (pct <= 0.75) { bg = 'hsla(142,76%,36%,.7)';  numColor = 'rgb(21,128,61)'; }
             else                  { bg = 'hsl(142,76%,28%)';       numColor = '#fff'; }
         }
-        const outline = isHoy ? 'outline:2px solid hsl(var(--primary));outline-offset:1px;' : '';
-        const cursor  = count > 0 ? 'pointer' : 'default';
-        const click   = count > 0 ? `onclick="calVerDia('${key}')"` : '';
-        const dayColor = isHoy ? 'hsl(var(--primary))' : 'hsl(var(--foreground))';
+        const outline   = isHoy ? 'outline:2px solid hsl(var(--primary));outline-offset:1px;' : '';
+        const cursor    = count > 0 ? 'pointer' : 'default';
+        const click     = count > 0 ? `onclick="calVerDia('${key}')"` : '';
+        const dayColor  = isHoy ? 'hsl(var(--primary))' : 'hsl(var(--foreground))';
         const dayWeight = isHoy ? '700' : '500';
+        const secStyle  = `font-size:.6rem;font-weight:500;opacity:.7;color:${count>0&&numColor==='#fff'?'rgba(255,255,255,.8)':'hsl(var(--muted-foreground))'};line-height:1;`;
 
-        html += `<div ${click} style="background:${bg};${outline}border-radius:6px;padding:5px 3px;text-align:center;cursor:${cursor};min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;transition:opacity .15s;" onmouseover="if(${count}>0)this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+        html += `<div ${click} style="background:${bg};${outline}border-radius:6px;padding:5px 3px;text-align:center;cursor:${cursor};min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;transition:opacity .15s;" onmouseover="if(${count}>0)this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
             <span style="font-size:.72rem;font-weight:${dayWeight};color:${dayColor};line-height:1;">${dia}</span>
-            ${count > 0 ? `<span style="font-size:.78rem;font-weight:700;color:${numColor};line-height:1;">${count}</span>` : ''}
+            ${count > 0 ? `<span style="font-size:.82rem;font-weight:700;color:${numColor};line-height:1;">${count}</span>` : ''}
+            ${count > 0 && secondary !== count ? `<span style="${secStyle}">${secondary}${secLabel}</span>` : ''}
         </div>`;
     }
     document.getElementById('cal-grid').innerHTML = html;
@@ -1883,9 +1915,20 @@ function calVerDia(key) {
     if (!idxs.length) return;
 
     const [a,m,d] = key.split('-');
-    const n = idxs.length;
+    const nParams  = idxs.length;
+    const nMuestras = _calMuestras(idxs);
     document.getElementById('cal-dia-titulo').textContent =
-        `${d}/${m}/${a} — ${n} muestra${n>1?'s':''} recibida${n>1?'s':''}`;
+        `${d}/${m}/${a} — ${nMuestras} muestra${nMuestras>1?'s':''} · ${nParams} parámetro${nParams>1?'s':''}`;
+
+    // Agrupar por Código para mostrar muestras únicas con su conteo de parámetros
+    const grupos = {}; // Código -> { primerIdx, params: [idx,...] }
+    idxs.forEach(idx => {
+        const s = datosGlobales[idx];
+        const cod = s.Muestra || String(idx);
+        if (!grupos[cod]) grupos[cod] = { primerIdx: idx, params: [] };
+        grupos[cod].params.push(idx);
+    });
+    const filasMuestras = Object.values(grupos);
 
     document.getElementById('cal-dia-lista').innerHTML =
         `<table class="w-full min-w-[520px] text-xs">
@@ -1894,16 +1937,18 @@ function calVerDia(key) {
             <th class="h-8 px-3 text-left font-medium" style="color:hsl(var(--muted-foreground))">Cliente</th>
             <th class="h-8 px-3 text-left font-medium" style="color:hsl(var(--muted-foreground))">Area</th>
             <th class="h-8 px-3 text-left font-medium" style="color:hsl(var(--muted-foreground))">Persona</th>
+            <th class="h-8 px-3 text-center font-medium" style="color:hsl(var(--muted-foreground))">Params</th>
             <th class="h-8 px-3 text-left font-medium" style="color:hsl(var(--muted-foreground))">Estado</th>
         </tr></thead>
         <tbody>
-        ${idxs.map(idx => {
-            const s = datosGlobales[idx];
-            return `<tr class="border-b hover:bg-muted/40 cursor-pointer transition-colors" style="border-color:hsl(var(--border))" onclick="abrirModal(${idx})">
+        ${filasMuestras.map(({ primerIdx, params }) => {
+            const s = datosGlobales[primerIdx];
+            return `<tr class="border-b hover:bg-muted/40 cursor-pointer transition-colors" style="border-color:hsl(var(--border))" onclick="abrirModal(${primerIdx})">
                 <td class="px-3 py-2 font-medium">${escHtml(s.Muestra||'')}</td>
                 <td class="px-3 py-2">${escHtml(s.Cliente||'')}</td>
                 <td class="px-3 py-2">${escHtml(s.Area||'')}</td>
                 <td class="px-3 py-2">${escHtml(s.Persona||'—')}</td>
+                <td class="px-3 py-2 text-center"><span class="inline-flex items-center justify-center rounded-full px-2 py-0.5 font-semibold text-xs" style="background:hsl(var(--muted));color:hsl(var(--foreground))">${params.length}</span></td>
                 <td class="px-3 py-2"><span class="inline-flex items-center rounded-full px-2 py-0.5 font-semibold ${estadoBadgeClass(s.estadoVencimiento)}">${estadoBadgeText(s.estadoVencimiento)}</span></td>
             </tr>`;
         }).join('')}
@@ -1962,8 +2007,9 @@ function renderCalGraficaSemana(recMap) {
         const [a,m,d] = key.split('-').map(Number);
         let dow = new Date(a, m-1, d).getDay();
         dow = dow === 0 ? 6 : dow - 1;
-        totals[dow] += idxs.length;
+        totals[dow] += _calCount(idxs);
     });
+    const label = calModo === 'muestras' ? 'Muestras recibidas' : 'Parámetros recibidos';
     if (charts['calendarioChart']) charts['calendarioChart'].destroy();
     const maxV = Math.max(...totals, 1);
     charts['calendarioChart'] = new Chart(document.getElementById('calendarioChart'), {
@@ -1971,7 +2017,7 @@ function renderCalGraficaSemana(recMap) {
         data: {
             labels: dias,
             datasets: [{
-                label: 'Muestras recibidas',
+                label,
                 data: totals,
                 backgroundColor: totals.map(v => {
                     const p = v/maxV;
