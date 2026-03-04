@@ -72,9 +72,35 @@ th[data-col]:hover{color:hsl(var(--primary));}
 html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));color:hsl(var(--foreground));border-color:hsl(var(--border));}
 .hm-cell{display:inline-flex;align-items:center;justify-content:center;min-width:68px;height:34px;border-radius:6px;font-size:.7rem;font-weight:600;padding:0 8px;}
 ::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:hsl(var(--border));border-radius:9999px;}
+/* Multiselect */
+.ms-wrap{position:relative;}
+.ms-btn{width:100%;height:36px;display:flex;align-items:center;justify-content:space-between;gap:6px;border-radius:6px;border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));padding:0 10px;font-size:.875rem;cursor:pointer;text-align:left;}
+.ms-btn:hover{background:hsl(var(--muted));}
+.ms-btn .ms-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ms-btn .ms-label.placeholder{color:hsl(var(--muted-foreground));}
+.ms-btn .ms-badge{flex-shrink:0;background:hsl(var(--primary));color:hsl(var(--primary-foreground));border-radius:9999px;font-size:.65rem;font-weight:700;padding:1px 6px;line-height:1.4;}
+.ms-panel{display:none;position:absolute;left:0;top:calc(100% + 4px);min-width:100%;max-width:300px;background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:.5rem;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:300;overflow:hidden;}
+.ms-panel.open{display:block;}
+.ms-panel-scroll{max-height:220px;overflow-y:auto;}
+.ms-opt{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:.8rem;cursor:pointer;white-space:nowrap;}
+.ms-opt:hover{background:hsl(var(--muted));}
+.ms-opt input[type=checkbox]{width:13px;height:13px;flex-shrink:0;}
+.ms-all-row{border-bottom:1px solid hsl(var(--border));padding:6px 12px 8px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.ms-clear-btn{font-size:.7rem;color:hsl(var(--muted-foreground));cursor:pointer;padding:2px 6px;border-radius:4px;border:1px solid hsl(var(--border));background:transparent;}
+.ms-clear-btn:hover{background:hsl(var(--muted));}
 #cal-grid>div{min-height:52px;}
 @media(max-width:640px){#cal-grid>div{min-height:40px;font-size:.65rem;}}
-@media print{aside,#statsRibbon,.no-print,#detailModal{display:none!important;}}
+@media print{
+  aside,#statsRibbon,.no-print,#detailModal,#spotlightOverlay,#staleBanner,header{display:none!important;}
+  body,html{background:white!important;color:black!important;}
+  #dashboardContent>div:not(#vista-miidia){display:none!important;}
+  #vista-miidia{display:block!important;}
+  .rounded-lg,.rounded-xl{border:1px solid #ccc!important;break-inside:avoid;}
+  #midia-caduc-wrap,#midia-sinfirma-wrap,#midia-finana-wrap{display:none!important;}
+  table{font-size:.75rem;}
+  th,td{padding:4px 8px!important;}
+  @page{margin:1.5cm;size:A4 portrait;}
+}
 </style>
 </head>
 <body class="antialiased">
@@ -120,6 +146,10 @@ html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));co
     <button onclick="cambiarVista('calendario')" id="nav-calendario" class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-muted transition-colors">
       <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
       <span class="sb-text">Carga por Fechas</span>
+    </button>
+    <button onclick="cambiarVista('comparativa')" id="nav-comparativa" class="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-muted transition-colors">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
+      <span class="sb-text">Comparativa</span>
     </button>
   </nav>
   <div class="user-section p-4 border-t" style="border-color:hsl(var(--border))">
@@ -180,13 +210,17 @@ html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));co
     </div>
   </div>
 </header>
-<div id="statsRibbon" class="no-print gap-2 px-4 py-2 border-b flex-wrap flex-shrink-0" style="border-color:hsl(var(--border));background:hsl(var(--card))">
+<div id="statsRibbon" class="no-print gap-2 px-4 py-2 border-b flex-wrap flex-shrink-0 items-center" style="border-color:hsl(var(--border));background:hsl(var(--card))">
   <button onclick="ribbonFilter('all')" id="rb-all" class="chip active">Total: <strong id="rb-n-all">0</strong></button>
   <button onclick="ribbonFilter('vencido')" id="rb-vencido" class="chip">&#128308; Vencidas: <strong id="rb-n-vencido">0</strong></button>
   <button onclick="ribbonFilter('proximo')" id="rb-proximo" class="chip">&#128992; Proximas: <strong id="rb-n-proximo">0</strong></button>
   <button onclick="ribbonFilter('ok')" id="rb-ok" class="chip">&#9989; En plazo: <strong id="rb-n-ok">0</strong></button>
   <button onclick="ribbonFilter('caduc')" id="rb-caduc" class="chip">&#9879;&#65039; Caduc. proxima: <strong id="rb-n-caduc">0</strong></button>
   <button onclick="ribbonFilter('sinfirma')" id="rb-sinfirma" class="chip">&#9999;&#65039; Sin firma: <strong id="rb-n-sinfirma">0</strong></button>
+  <div class="ml-auto flex items-center gap-1 rounded-full border px-1 py-0.5" style="border-color:hsl(var(--border));background:hsl(var(--muted))" title="Cambiar modo de conteo">
+    <button id="toggle-muestras" onclick="setModoConteo('muestras')" class="rounded-full px-2.5 py-0.5 text-xs font-medium transition-all" style="background:hsl(var(--primary));color:hsl(var(--primary-foreground))">Muestras</button>
+    <button id="toggle-parametros" onclick="setModoConteo('parametros')" class="rounded-full px-2.5 py-0.5 text-xs font-medium transition-all" style="background:transparent;color:hsl(var(--muted-foreground))">Parámetros</button>
+  </div>
 </div>
 <div class="flex-1 overflow-y-auto p-5">
 <div id="uploadSection" class="max-w-lg mx-auto mt-10 space-y-4">
@@ -250,11 +284,11 @@ html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));co
   <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
     <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
       <div class="flex items-center justify-between pb-2">
-        <h3 class="text-sm font-medium" style="color:hsl(var(--muted-foreground))">Total Muestras</h3>
+        <h3 id="kpi-total-label" class="text-sm font-medium" style="color:hsl(var(--muted-foreground))">Total Muestras</h3>
         <svg class="h-4 w-4" style="color:hsl(var(--muted-foreground))" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
       </div>
       <div id="totalMuestras" class="text-2xl font-bold" style="color:hsl(var(--foreground))">0</div>
-      <p class="text-xs mt-1" style="color:hsl(var(--muted-foreground))">Muestras pendientes</p>
+      <p id="kpi-total-sublabel" class="text-xs mt-1" style="color:hsl(var(--muted-foreground))">Muestras pendientes</p>
     </div>
     <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
       <div class="flex items-center justify-between pb-2">
@@ -269,7 +303,7 @@ html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));co
         <h3 class="text-sm font-medium" style="color:hsl(var(--muted-foreground))">Proximas a vencer</h3>
         <svg class="h-4 w-4" style="color:hsl(var(--muted-foreground))" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       </div>
-      <div id="muestrasProximas" class="text-2xl font-bold" class="text-orange-600">0</div>
+      <div id="muestrasProximas" class="text-2xl font-bold text-orange-500">0</div>
       <p class="text-xs mt-1" style="color:hsl(var(--muted-foreground))">Vencen en 7 dias o menos</p>
     </div>
     <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
@@ -285,7 +319,7 @@ html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));co
         <h3 class="text-sm font-medium" style="color:hsl(var(--muted-foreground))">Caducidad Proxima</h3>
         <svg class="h-4 w-4" style="color:hsl(var(--muted-foreground))" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
       </div>
-      <div id="caducidadCard" class="text-2xl font-bold" class="text-orange-500">0</div>
+      <div id="caducidadCard" class="text-2xl font-bold text-orange-400">0</div>
       <p class="text-xs mt-1" style="color:hsl(var(--muted-foreground))">Vencen en menos de 30 dias</p>
     </div>
   </div>
@@ -305,9 +339,15 @@ html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));co
   </div>
 </div>
 <div id="vista-miidia" class="hidden space-y-5">
-  <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--primary));border-color:hsl(var(--primary))">
-    <p id="midia-fecha" class="text-sm opacity-80" style="color:hsl(var(--primary-foreground))"></p>
-    <p id="midia-saludo" class="text-xl font-bold mt-1" style="color:hsl(var(--primary-foreground))">Bienvenido</p>
+  <div class="rounded-lg border p-5 shadow-sm flex items-center justify-between gap-4" style="background:hsl(var(--primary));border-color:hsl(var(--primary))">
+    <div>
+      <p id="midia-fecha" class="text-sm opacity-80" style="color:hsl(var(--primary-foreground))"></p>
+      <p id="midia-saludo" class="text-xl font-bold mt-1" style="color:hsl(var(--primary-foreground))">Bienvenido</p>
+    </div>
+    <button onclick="window.print()" class="no-print flex-shrink-0 inline-flex items-center gap-1.5 rounded-md px-3 h-8 text-xs font-medium transition-colors hover:opacity-80" style="background:rgba(255,255,255,.2);color:hsl(var(--primary-foreground));border:1px solid rgba(255,255,255,.3)" title="Imprimir parte de trabajo">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+      Imprimir parte
+    </button>
   </div>
   <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
     <div class="p-4 border-b flex items-center gap-2" style="border-color:hsl(var(--border))">
@@ -502,25 +542,95 @@ html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));co
 <div id="vista-tablas" class="hidden space-y-5">
   <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
     <h3 class="text-sm font-semibold mb-3">Filtros</h3>
-    <div class="grid gap-3 md:grid-cols-5">
-      <select id="filterArea" class="flex h-9 rounded-md border px-3 py-2 text-sm focus:outline-none" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
-        <option value="">Todas las areas</option>
-      </select>
-      <select id="filterCliente" class="flex h-9 rounded-md border px-3 py-2 text-sm focus:outline-none" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
-        <option value="">Todos los clientes</option>
-      </select>
-      <select id="filterParametro" class="flex h-9 rounded-md border px-3 py-2 text-sm focus:outline-none" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
-        <option value="">Todos los parametros</option>
-      </select>
-      <select id="filterEstado" class="flex h-9 rounded-md border px-3 py-2 text-sm focus:outline-none" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
-        <option value="">Todos los estados</option>
-        <option value="vencido">Vencidos</option>
-        <option value="proximo">Proximos</option>
-        <option value="ok">En plazo</option>
-      </select>
-      <select id="filterPersona" class="flex h-9 rounded-md border px-3 py-2 text-sm focus:outline-none" style="border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))">
-        <option value="">Todas las personas</option>
-      </select>
+    <div class="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+      <!-- Area -->
+      <div class="ms-wrap" id="ms-filterArea">
+        <button type="button" class="ms-btn" onclick="msOpen('filterArea')">
+          <span class="ms-label placeholder" id="ms-lbl-filterArea">Todas las areas</span>
+          <svg class="w-3.5 h-3.5 flex-shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="ms-panel" id="ms-panel-filterArea">
+          <div class="ms-all-row">
+            <label class="ms-opt" style="padding:0;border:none"><input type="checkbox" id="ms-all-filterArea" checked onchange="msToggleAll('filterArea',this)"> <span style="font-weight:600">Todos</span></label>
+            <button class="ms-clear-btn" onclick="msClear('filterArea')">Limpiar</button>
+          </div>
+          <div class="ms-panel-scroll" id="ms-list-filterArea"></div>
+        </div>
+      </div>
+      <!-- Cliente -->
+      <div class="ms-wrap" id="ms-filterCliente">
+        <button type="button" class="ms-btn" onclick="msOpen('filterCliente')">
+          <span class="ms-label placeholder" id="ms-lbl-filterCliente">Todos los clientes</span>
+          <svg class="w-3.5 h-3.5 flex-shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="ms-panel" id="ms-panel-filterCliente">
+          <div class="ms-all-row">
+            <label class="ms-opt" style="padding:0;border:none"><input type="checkbox" id="ms-all-filterCliente" checked onchange="msToggleAll('filterCliente',this)"> <span style="font-weight:600">Todos</span></label>
+            <button class="ms-clear-btn" onclick="msClear('filterCliente')">Limpiar</button>
+          </div>
+          <div class="ms-panel-scroll" id="ms-list-filterCliente"></div>
+        </div>
+      </div>
+      <!-- Parametro -->
+      <div class="ms-wrap" id="ms-filterParametro">
+        <button type="button" class="ms-btn" onclick="msOpen('filterParametro')">
+          <span class="ms-label placeholder" id="ms-lbl-filterParametro">Todos los parametros</span>
+          <svg class="w-3.5 h-3.5 flex-shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="ms-panel" id="ms-panel-filterParametro">
+          <div class="ms-all-row">
+            <label class="ms-opt" style="padding:0;border:none"><input type="checkbox" id="ms-all-filterParametro" checked onchange="msToggleAll('filterParametro',this)"> <span style="font-weight:600">Todos</span></label>
+            <button class="ms-clear-btn" onclick="msClear('filterParametro')">Limpiar</button>
+          </div>
+          <div class="ms-panel-scroll" id="ms-list-filterParametro"></div>
+        </div>
+      </div>
+      <!-- Estado (opciones fijas) -->
+      <div class="ms-wrap" id="ms-filterEstado">
+        <button type="button" class="ms-btn" onclick="msOpen('filterEstado')">
+          <span class="ms-label placeholder" id="ms-lbl-filterEstado">Todos los estados</span>
+          <svg class="w-3.5 h-3.5 flex-shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="ms-panel" id="ms-panel-filterEstado">
+          <div class="ms-all-row">
+            <label class="ms-opt" style="padding:0;border:none"><input type="checkbox" id="ms-all-filterEstado" checked onchange="msToggleAll('filterEstado',this)"> <span style="font-weight:600">Todos</span></label>
+            <button class="ms-clear-btn" onclick="msClear('filterEstado')">Limpiar</button>
+          </div>
+          <div class="ms-panel-scroll" id="ms-list-filterEstado">
+            <label class="ms-opt"><input type="checkbox" class="ms-cb-filterEstado" value="vencido" onchange="msCbChange('filterEstado')"> Vencidos</label>
+            <label class="ms-opt"><input type="checkbox" class="ms-cb-filterEstado" value="proximo" onchange="msCbChange('filterEstado')"> Proximos</label>
+            <label class="ms-opt"><input type="checkbox" class="ms-cb-filterEstado" value="ok" onchange="msCbChange('filterEstado')"> En plazo</label>
+          </div>
+        </div>
+      </div>
+      <!-- Persona -->
+      <div class="ms-wrap" id="ms-filterPersona">
+        <button type="button" class="ms-btn" onclick="msOpen('filterPersona')">
+          <span class="ms-label placeholder" id="ms-lbl-filterPersona">Todas los puestos</span>
+          <svg class="w-3.5 h-3.5 flex-shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="ms-panel" id="ms-panel-filterPersona">
+          <div class="ms-all-row">
+            <label class="ms-opt" style="padding:0;border:none"><input type="checkbox" id="ms-all-filterPersona" checked onchange="msToggleAll('filterPersona',this)"> <span style="font-weight:600">Todos</span></label>
+            <button class="ms-clear-btn" onclick="msClear('filterPersona')">Limpiar</button>
+          </div>
+          <div class="ms-panel-scroll" id="ms-list-filterPersona"></div>
+        </div>
+      </div>
+      <!-- Matriz -->
+      <div class="ms-wrap" id="ms-filterMatriz">
+        <button type="button" class="ms-btn" onclick="msOpen('filterMatriz')">
+          <span class="ms-label placeholder" id="ms-lbl-filterMatriz">Todas las matrices</span>
+          <svg class="w-3.5 h-3.5 flex-shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <div class="ms-panel" id="ms-panel-filterMatriz">
+          <div class="ms-all-row">
+            <label class="ms-opt" style="padding:0;border:none"><input type="checkbox" id="ms-all-filterMatriz" checked onchange="msToggleAll('filterMatriz',this)"> <span style="font-weight:600">Todos</span></label>
+            <button class="ms-clear-btn" onclick="msClear('filterMatriz')">Limpiar</button>
+          </div>
+          <div class="ms-panel-scroll" id="ms-list-filterMatriz"></div>
+        </div>
+      </div>
     </div>
     <div class="flex flex-wrap gap-2 mt-3">
       <button id="chip-vencidas" onclick="setQuickFilter('vencidas')" class="chip">&#128308; Vencidas</button>
@@ -530,7 +640,7 @@ html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));co
       <button id="chip-sinfirma" onclick="setQuickFilter('sinfirma')" class="chip">&#9999;&#65039; Sin firma</button>
       <button id="chip-finana" onclick="setQuickFilter('finana')" class="chip">&#128300; Sin FinAna</button>
       <button id="chip-enplazo" onclick="setQuickFilter('enplazo')" class="chip">&#9989; En plazo</button>
-      <button onclick="setQuickFilter('')" class="chip">x Limpiar</button>
+      <button onclick="setQuickFilter('');msClearAll()" class="chip">x Limpiar todo</button>
     </div>
   </div>
   <div class="rounded-lg border shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
@@ -769,9 +879,59 @@ html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));co
 
   <!-- Grafico resumen por dia de semana -->
   <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
-    <h3 class="text-base font-semibold mb-1">Recepciones por dia de la semana</h3>
-    <p class="text-xs mb-4" style="color:hsl(var(--muted-foreground))">Total historico de todas las muestras cargadas</p>
+    <div class="flex items-start justify-between gap-3 mb-4">
+      <div>
+        <h3 class="text-base font-semibold">Recepciones por dia de la semana</h3>
+        <p id="calChartSubtitle" class="text-xs mt-0.5" style="color:hsl(var(--muted-foreground))">Total historico</p>
+      </div>
+      <div class="flex items-center gap-1 rounded-full border px-1 py-0.5 flex-shrink-0" style="border-color:hsl(var(--border));background:hsl(var(--muted))">
+        <button id="calChartBtnMes" onclick="setCalChartModo('mes')" class="rounded-full px-2.5 py-0.5 text-xs font-medium transition-all" style="background:hsl(var(--primary));color:hsl(var(--primary-foreground))">Este mes</button>
+        <button id="calChartBtnHist" onclick="setCalChartModo('historico')" class="rounded-full px-2.5 py-0.5 text-xs font-medium transition-all" style="background:transparent;color:hsl(var(--muted-foreground))">Historico</button>
+      </div>
+    </div>
     <div class="chart-container" style="height:280px"><canvas id="calendarioChart"></canvas></div>
+  </div>
+</div>
+<!-- ─── Vista Comparativa Analistas ─── -->
+<div id="vista-comparativa" class="hidden space-y-5">
+  <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+      <div>
+        <h3 class="text-base font-semibold">Comparativa de Analistas</h3>
+        <p class="text-xs mt-0.5" style="color:hsl(var(--muted-foreground))">Carga de trabajo en tiempo real por persona</p>
+      </div>
+      <div class="flex items-center gap-1 rounded-full border px-1 py-0.5" style="border-color:hsl(var(--border));background:hsl(var(--muted))">
+        <button id="comp-btn-muestras" onclick="setCompModo('muestras')" class="rounded-full px-2.5 py-0.5 text-xs font-medium transition-all" style="background:hsl(var(--primary));color:hsl(var(--primary-foreground))">Muestras</button>
+        <button id="comp-btn-parametros" onclick="setCompModo('parametros')" class="rounded-full px-2.5 py-0.5 text-xs font-medium transition-all" style="background:transparent;color:hsl(var(--muted-foreground))">Parámetros</button>
+      </div>
+    </div>
+    <div id="comp-grid" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"></div>
+  </div>
+  <div class="rounded-lg border p-5 shadow-sm" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <h3 class="text-base font-semibold mb-4">Ranking de carga</h3>
+    <div class="chart-container" style="height:320px"><canvas id="compChart"></canvas></div>
+  </div>
+  <div class="rounded-lg border shadow-sm overflow-hidden" style="background:hsl(var(--card));border-color:hsl(var(--border))">
+    <div class="p-4 border-b" style="border-color:hsl(var(--border))">
+      <h3 class="text-base font-semibold">Detalle por analista</h3>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[700px]">
+        <thead class="border-b" style="background:hsl(var(--muted));border-color:hsl(var(--border))">
+          <tr>
+            <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Analista</th>
+            <th class="h-10 px-4 text-center text-xs font-medium" style="color:hsl(var(--muted-foreground))">Total</th>
+            <th class="h-10 px-4 text-center text-xs font-medium" style="color:hsl(var(--destructive))">Vencidas</th>
+            <th class="h-10 px-4 text-center text-xs font-medium" style="color:hsl(24.6 95% 53.1%)">Proximas</th>
+            <th class="h-10 px-4 text-center text-xs font-medium" style="color:hsl(142 76% 36%)">En plazo</th>
+            <th class="h-10 px-4 text-center text-xs font-medium" style="color:hsl(var(--muted-foreground))">Sin firma</th>
+            <th class="h-10 px-4 text-center text-xs font-medium" style="color:hsl(var(--muted-foreground))">Sin FinAna</th>
+            <th class="h-10 px-4 text-left text-xs font-medium" style="color:hsl(var(--muted-foreground))">Carga</th>
+          </tr>
+        </thead>
+        <tbody id="comp-tabla-body"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 </div>
@@ -790,6 +950,31 @@ html.dark select,html.dark input[type=text]{background-color:hsl(var(--card));co
     <div id="modalContent"></div>
   </div>
 </div>
+<!-- ─── Spotlight / ─── -->
+<div id="spotlightOverlay" style="display:none;position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.5);align-items:flex-start;justify-content:center;padding-top:10vh" onclick="cerrarSpotlight()">
+  <div style="width:100%;max-width:560px;background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:.75rem;box-shadow:0 25px 60px rgba(0,0,0,.3);overflow:hidden" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid hsl(var(--border))">
+      <svg style="width:16px;height:16px;flex-shrink:0;color:hsl(var(--muted-foreground))" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <input id="spotlightInput" placeholder="Buscar muestra, cliente, parámetro…" autocomplete="off"
+        style="flex:1;background:transparent;border:none;outline:none;font-size:.95rem;color:hsl(var(--foreground))"
+        oninput="spotlightBuscar(this.value)" onkeydown="spotlightNav(event)">
+      <kbd style="font-size:.65rem;padding:2px 6px;border-radius:4px;border:1px solid hsl(var(--border));color:hsl(var(--muted-foreground))">Esc</kbd>
+    </div>
+    <div style="padding:8px 16px 6px;display:flex;gap:8px;font-size:.7rem;color:hsl(var(--muted-foreground));border-bottom:1px solid hsl(var(--border))">
+      Abre con <kbd style="padding:1px 5px;border-radius:3px;border:1px solid hsl(var(--border));font-size:.65rem">/</kbd>
+    </div>
+    <div id="spotlightResults" style="max-height:380px;overflow-y:auto"></div>
+    <div style="padding:8px 16px;border-top:1px solid hsl(var(--border));display:flex;gap:12px;font-size:.7rem;color:hsl(var(--muted-foreground))">
+      <span>↑↓ navegar</span><span>↵ abrir</span><span>Esc cerrar</span>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Banner datos obsoletos ─── -->
+<div id="staleBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:10500;background:hsl(38 92% 50%);color:#000;font-size:.8rem;font-weight:600;text-align:center;padding:6px 16px;cursor:pointer" onclick="this.style.display='none'" title="Clic para cerrar">
+  ⚠️ Los datos tienen más de 1 día de antigüedad — recarga el archivo para ver información actualizada &nbsp;✕
+</div>
+
 <div id="toastContainer"></div>
 <script>
 
@@ -807,10 +992,63 @@ const FILAS_PAGINA  = 50;
 let filtradosActual = [];
 let quickFilterActivo = '';
 let ribbonFilterActivo = '';
+let modoConteo = 'muestras'; // 'muestras' | 'parametros'
 
 const LS_RAW  = 'labDashboard_v3_raw';
 const LS_META = 'labDashboard_v3_meta';
 const LS_DARK = 'lab_darkmode';
+
+// ─── Modo Conteo (Muestras / Parámetros) ─────────────────────────────────────
+function getMuestrasUnicas(arr) {
+    // Agrupa parámetros por Muestra; el peor estado de vencimiento/caducidad gana
+    const map = new Map();
+    const ordenVenc = { vencido: 2, proximo: 1, ok: 0 };
+    const ordenCaduc = { caducado: 2, proxima: 1, ok: 0 };
+    arr.forEach(d => {
+        const key = String(d.Muestra || '').trim();
+        if (!key) return;
+        if (!map.has(key)) {
+            map.set(key, { ...d });
+        } else {
+            const cur = map.get(key);
+            // Peor estado vencimiento
+            if ((ordenVenc[d.estadoVencimiento] || 0) > (ordenVenc[cur.estadoVencimiento] || 0))
+                cur.estadoVencimiento = d.estadoVencimiento;
+            // Peor estado caducidad
+            if ((ordenCaduc[d.estadoCaducidad] || 0) > (ordenCaduc[cur.estadoCaducidad] || 0))
+                cur.estadoCaducidad = d.estadoCaducidad;
+            // Si algún param no tiene firma o finAna, la muestra tampoco
+            if (!d.firmado) cur.firmado = false;
+            if (!d.finAnaCompleto) cur.finAnaCompleto = false;
+            // Acumular diasEspera (usar el máximo)
+            if ((d.diasEspera || 0) > (cur.diasEspera || 0)) cur.diasEspera = d.diasEspera;
+        }
+    });
+    return Array.from(map.values());
+}
+
+function getDataParaConteo() {
+    return modoConteo === 'muestras' ? getMuestrasUnicas(datosGlobales) : datosGlobales;
+}
+
+function setModoConteo(modo) {
+    modoConteo = modo;
+    const btnM = document.getElementById('toggle-muestras');
+    const btnP = document.getElementById('toggle-parametros');
+    if (btnM && btnP) {
+        const activeStyle = 'background:hsl(var(--primary));color:hsl(var(--primary-foreground))';
+        const inactiveStyle = 'background:transparent;color:hsl(var(--muted-foreground))';
+        btnM.style.cssText = modoConteo === 'muestras' ? activeStyle : inactiveStyle;
+        btnP.style.cssText = modoConteo === 'parametros' ? activeStyle : inactiveStyle;
+    }
+    actualizarKPIs();
+    actualizarRibbon();
+    // Actualizar label de la KPI card
+    const lbl = document.getElementById('kpi-total-label');
+    if (lbl) lbl.textContent = modoConteo === 'muestras' ? 'Total Muestras' : 'Total Parámetros';
+    const sublbl = document.getElementById('kpi-total-sublabel');
+    if (sublbl) sublbl.textContent = modoConteo === 'muestras' ? 'Muestras pendientes' : 'Parámetros pendientes';
+}
 
 // ─── Dark Mode ──────────────────────────────────────────────────────────────
 function toggleDarkMode() {
@@ -843,17 +1081,23 @@ function toggleSidebar() {
 }
 
 // ─── Date Parsing ───────────────────────────────────────────────────────────
+// Crea una fecha en medianoche hora local (sin desplazamiento de TZ)
+function _fechaLocal(y, m, d) { const dt = new Date(y, m, d); dt.setHours(0,0,0,0); return dt; }
 function parseFecha(val) {
     if (!val) return null;
-    if (val instanceof Date && !isNaN(val)) return val;
+    if (val instanceof Date && !isNaN(val)) { const d = new Date(val); d.setHours(0,0,0,0); return d; }
     const s = String(val).trim();
     const iso = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-    if (iso) { const d=new Date(+iso[1],+iso[2]-1,+iso[3]); if(!isNaN(d)) return d; }
+    if (iso) { const d=_fechaLocal(+iso[1],+iso[2]-1,+iso[3]); if(!isNaN(d)) return d; }
     const dmy = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
-    if (dmy) { const d=new Date(+dmy[3],+dmy[2]-1,+dmy[1]); if(!isNaN(d)) return d; }
+    if (dmy) { const d=_fechaLocal(+dmy[3],+dmy[2]-1,+dmy[1]); if(!isNaN(d)) return d; }
     const serial = parseFloat(s);
     if (!isNaN(serial) && serial > 1000) {
-        const d = new Date(Math.round((serial - 25569) * 86400 * 1000));
+        // Convertir serial Excel a fecha local sin depender de UTC:
+        // serial 1 = 1 ene 1900 (Excel cuenta mal el 29-feb-1900, por eso -1 extra)
+        const offsetDias = serial - 25569 - (serial >= 60 ? 0 : -1);
+        const d = new Date(1970, 0, 1 + offsetDias);
+        d.setHours(0,0,0,0);
         if (!isNaN(d)) return d;
     }
     return null;
@@ -904,7 +1148,7 @@ function procesarDatos(data) {
         return { ...out, diasEspera, diasPlazo, diasParaVencer, pctPlazo,
                  diasParaCaducar, estadoVencimiento, estadoCaducidad,
                  firmado, finAnaCompleto };
-    });
+    }).map((row, i) => ({ ...row, _gIdx: i })); // índice estable para el modal
 }
 
 // ─── Excel Reader ────────────────────────────────────────────────────────────
@@ -1037,7 +1281,7 @@ function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'
 
 // ─── Navigation ─────────────────────────────────────────────────────────────
 function cambiarVista(vista) {
-    const vistas = ['general','miidia','kpi','graficas','tablas','analisis','alertas','equipo','calendario'];
+    const vistas = ['general','miidia','kpi','graficas','tablas','analisis','alertas','equipo','calendario','comparativa'];
     document.querySelectorAll('aside nav button').forEach(btn=>btn.classList.remove('sidebar-active'));
     const navBtn = document.getElementById('nav-'+vista);
     if (navBtn) navBtn.classList.add('sidebar-active');
@@ -1054,7 +1298,8 @@ function cambiarVista(vista) {
         analisis:['Analisis Avanzado','Analisis y tendencias'],
         alertas: ['Alertas','Muestras que requieren atencion'],
         equipo:      ['Gestion de Equipo','Carga de trabajo por persona'],
-        calendario:  ['Carga por Fechas','Distribucion semanal y mensual de muestras pendientes']
+        calendario:   ['Carga por Fechas','Distribucion semanal y mensual de muestras pendientes'],
+        comparativa:  ['Comparativa de Analistas','Carga de trabajo en tiempo real por persona']
     };
     if (titles[vista]) {
         document.getElementById('pageTitle').textContent    = titles[vista][0];
@@ -1072,7 +1317,8 @@ function renderVista(vista) {
         case 'analisis': actualizarAnalisisAvanzado(); break;
         case 'alertas':  actualizarTablaAlertas(); break;
         case 'equipo':      actualizarCargaTrabajo(); actualizarGraficoEquipo(); actualizarHeatmap(); break;
-        case 'calendario':  actualizarCalendario(); break;
+        case 'calendario':   actualizarCalendario(); break;
+        case 'comparativa':  actualizarComparativa(); break;
     }
 }
 
@@ -1087,11 +1333,12 @@ function actualizarDashboard() {
 }
 
 function actualizarKPIs() {
-    const total    = datosGlobales.length;
-    const vencidas = datosGlobales.filter(d=>d.estadoVencimiento==='vencido').length;
-    const proximas = datosGlobales.filter(d=>d.estadoVencimiento==='proximo').length;
-    const promDias = total > 0 ? (datosGlobales.reduce((s,d)=>s+(d.diasEspera||0),0)/total).toFixed(1) : 0;
-    const caducProx= datosGlobales.filter(d=>d.estadoCaducidad==='proxima'||d.estadoCaducidad==='caducado').length;
+    const datos    = getDataParaConteo();
+    const total    = datos.length;
+    const vencidas = datos.filter(d=>d.estadoVencimiento==='vencido').length;
+    const proximas = datos.filter(d=>d.estadoVencimiento==='proximo').length;
+    const promDias = total > 0 ? (datos.reduce((s,d)=>s+(d.diasEspera||0),0)/total).toFixed(1) : 0;
+    const caducProx= datos.filter(d=>d.estadoCaducidad==='proxima'||d.estadoCaducidad==='caducado').length;
     document.getElementById('totalMuestras').textContent    = total;
     document.getElementById('muestrasVencidas').textContent = vencidas;
     document.getElementById('muestrasProximas').textContent = proximas;
@@ -1104,12 +1351,13 @@ function actualizarBadgeAlertas() {
 }
 
 function actualizarRibbon() {
-    const total    = datosGlobales.length;
-    const venc     = datosGlobales.filter(d=>d.estadoVencimiento==='vencido').length;
-    const prox     = datosGlobales.filter(d=>d.estadoVencimiento==='proximo').length;
-    const ok       = datosGlobales.filter(d=>d.estadoVencimiento==='ok').length;
-    const caduc    = datosGlobales.filter(d=>d.estadoCaducidad==='proxima'||d.estadoCaducidad==='caducado').length;
-    const sinFirma = datosGlobales.filter(d=>!d.firmado).length;
+    const datos    = getDataParaConteo();
+    const total    = datos.length;
+    const venc     = datos.filter(d=>d.estadoVencimiento==='vencido').length;
+    const prox     = datos.filter(d=>d.estadoVencimiento==='proximo').length;
+    const ok       = datos.filter(d=>d.estadoVencimiento==='ok').length;
+    const caduc    = datos.filter(d=>d.estadoCaducidad==='proxima'||d.estadoCaducidad==='caducado').length;
+    const sinFirma = datos.filter(d=>!d.firmado).length;
     document.getElementById('rb-n-all').textContent    = total;
     document.getElementById('rb-n-vencido').textContent= venc;
     document.getElementById('rb-n-proximo').textContent= prox;
@@ -1117,7 +1365,7 @@ function actualizarRibbon() {
     document.getElementById('rb-n-caduc').textContent  = caduc;
     document.getElementById('rb-n-sinfirma').textContent = sinFirma;
     const ribbon = document.getElementById('statsRibbon');
-    if (total > 0) ribbon.classList.add('visible'); else ribbon.classList.remove('visible');
+    if (datosGlobales.length > 0) ribbon.classList.add('visible'); else ribbon.classList.remove('visible');
 }
 
 function ribbonFilter(tipo) {
@@ -1287,7 +1535,7 @@ function actualizarMiDia() {
         const dias = d[diasKey];
         const fechaVal = d[fechaKey] ? formatFecha(d[fechaKey]) : '-';
         const clr = dias !== null && dias < 0 ? 'color:hsl(var(--destructive))' : dias <= 3 ? 'color:hsl(24.6 95% 53.1%)' : '';
-        return `<tr class="border-b hover:bg-muted/50 cursor-pointer" style="border-color:hsl(var(--border))" onclick="abrirModal(${datos.indexOf(d)})">
+        return `<tr class="border-b hover:bg-muted/50 cursor-pointer" style="border-color:hsl(var(--border))" onclick="abrirModal(${d._gIdx})">
             <td class="px-3 py-2 text-sm font-medium whitespace-nowrap">${d.Muestra||'-'}</td>
             <td class="px-3 py-2 text-sm" style="color:hsl(var(--muted-foreground))">${(d.Cliente||'-').substring(0,25)}</td>
             <td class="px-3 py-2 text-sm whitespace-nowrap" style="color:hsl(var(--muted-foreground))">${fechaVal}</td>
@@ -1316,11 +1564,86 @@ function actualizarMiDia() {
 function actualizarAlertasRecientes() {
     const alertas=datosGlobales.filter(d=>d.estadoVencimiento!=='ok').sort((a,b)=>a.diasParaVencer-b.diasParaVencer).slice(0,5);
     document.getElementById('recentAlerts').innerHTML = alertas.map((d,i)=>`
-        <div class="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors" style="border-color:hsl(var(--border))" onclick="abrirModal(${datosGlobales.indexOf(d)})">
+        <div class="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors" style="border-color:hsl(var(--border))" onclick="abrirModal(${d._gIdx})">
             <div class="flex-1"><p class="text-sm font-medium">${d.Muestra} — ${d.Parametro||''}</p><p class="text-xs" style="color:hsl(var(--muted-foreground))">${(d.Cliente||'').substring(0,40)} · F.Limite: ${formatFecha(d['F.Limite']||d['F.Límite'])}</p></div>
             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ml-3 ${estadoBadgeClass(d.estadoVencimiento)}">${estadoBadgeText(d.estadoVencimiento)}</span>
         </div>
     `).join('') || '<p class="text-sm" style="color:hsl(var(--muted-foreground))">Sin alertas activas.</p>';
+}
+
+// ─── Multiselect Filters ─────────────────────────────────────────────────────
+const MS_IDS = ['filterArea','filterCliente','filterParametro','filterEstado','filterPersona','filterMatriz'];
+const MS_PLACEHOLDERS = {
+    filterArea:      'Todas las areas',
+    filterCliente:   'Todos los clientes',
+    filterParametro: 'Todos los parametros',
+    filterEstado:    'Todos los estados',
+    filterPersona:   'Todas los puestos',
+    filterMatriz:    'Todas las matrices',
+};
+const msSel = {}; // id -> Set of selected values
+MS_IDS.forEach(id => { msSel[id] = new Set(); });
+
+function msOpen(id) {
+    const panel = document.getElementById('ms-panel-' + id);
+    if (!panel) return;
+    const isOpen = panel.classList.contains('open');
+    // Close all other panels
+    MS_IDS.forEach(i => { const p = document.getElementById('ms-panel-' + i); if (p) p.classList.remove('open'); });
+    if (!isOpen) panel.classList.add('open');
+}
+
+function msCbChange(id) {
+    const cbs = document.querySelectorAll('.ms-cb-' + id);
+    msSel[id] = new Set([...cbs].filter(c => c.checked).map(c => c.value));
+    const allCb = document.getElementById('ms-all-' + id);
+    if (allCb) allCb.checked = msSel[id].size === 0;
+    msUpdateBtn(id);
+    aplicarFiltrosTabla();
+}
+
+function msToggleAll(id, cb) {
+    if (cb.checked) {
+        msClear(id);
+    } else {
+        cb.checked = true; // can't deselect "All" directly
+    }
+}
+
+function msClear(id) {
+    msSel[id] = new Set();
+    document.querySelectorAll('.ms-cb-' + id).forEach(c => { c.checked = false; });
+    const allCb = document.getElementById('ms-all-' + id);
+    if (allCb) allCb.checked = true;
+    msUpdateBtn(id);
+    aplicarFiltrosTabla();
+}
+
+function msClearAll() {
+    MS_IDS.forEach(id => msClear(id));
+}
+
+function msUpdateBtn(id) {
+    const lbl = document.getElementById('ms-lbl-' + id);
+    if (!lbl) return;
+    const count = msSel[id].size;
+    if (count === 0) {
+        lbl.textContent = MS_PLACEHOLDERS[id];
+        lbl.classList.add('placeholder');
+        lbl.nextElementSibling && lbl.parentElement.querySelector('.ms-badge') && lbl.parentElement.querySelector('.ms-badge').remove();
+    } else {
+        const vals = [...msSel[id]];
+        lbl.textContent = count === 1 ? vals[0].substring(0, 30) : count + ' seleccionados';
+        lbl.classList.remove('placeholder');
+    }
+}
+
+function msPoblar(id, vals) {
+    const list = document.getElementById('ms-list-' + id);
+    if (!list) return;
+    list.innerHTML = vals.map(v =>
+        `<label class="ms-opt"><input type="checkbox" class="ms-cb-${id}" value="${escHtml(String(v))}" onchange="msCbChange('${id}')"> <span class="truncate" style="max-width:200px;display:inline-block">${escHtml(String(v).substring(0, 50))}</span></label>`
+    ).join('');
 }
 
 // ─── Main Table ──────────────────────────────────────────────────────────────
@@ -1342,20 +1665,16 @@ function actualizarColumnasVisibles() {
 }
 
 function aplicarFiltrosTabla() {
-    if (!document.getElementById('filterArea')) return;
-    const area     = document.getElementById('filterArea').value;
-    const cliente  = document.getElementById('filterCliente').value;
-    const parametro= document.getElementById('filterParametro').value;
-    const estado   = document.getElementById('filterEstado').value;
-    const persona  = document.getElementById('filterPersona').value;
+    if (!document.getElementById('ms-filterArea')) return;
     const busqueda = (document.getElementById('searchTable').value||'').toLowerCase();
 
     let filtrados = [...datosGlobales];
-    if (area)      filtrados = filtrados.filter(d=>d.Area===area);
-    if (cliente)   filtrados = filtrados.filter(d=>d.Cliente===cliente);
-    if (parametro) filtrados = filtrados.filter(d=>d.Parametro===parametro);
-    if (estado)    filtrados = filtrados.filter(d=>d.estadoVencimiento===estado);
-    if (persona)   filtrados = filtrados.filter(d=>d.Persona===persona);
+    if (msSel.filterArea.size)      filtrados = filtrados.filter(d=>msSel.filterArea.has(d.Area));
+    if (msSel.filterCliente.size)   filtrados = filtrados.filter(d=>msSel.filterCliente.has(d.Cliente));
+    if (msSel.filterParametro.size) filtrados = filtrados.filter(d=>msSel.filterParametro.has(d.Parametro));
+    if (msSel.filterEstado.size)    filtrados = filtrados.filter(d=>msSel.filterEstado.has(d.estadoVencimiento));
+    if (msSel.filterPersona.size)   filtrados = filtrados.filter(d=>msSel.filterPersona.has(d.Persona));
+    if (msSel.filterMatriz.size)    filtrados = filtrados.filter(d=>msSel.filterMatriz.has(d.Matriz));
     if (busqueda)  filtrados = filtrados.filter(d=>
         String(d.Muestra||'').toLowerCase().includes(busqueda)||
         String(d.Cliente||'').toLowerCase().includes(busqueda)||
@@ -1474,10 +1793,8 @@ function toggleColMenu() {
 function actualizarTablaPrincipal() {
     aplicarFiltrosTabla();
     if (!filtrosListenersAttached) {
-        ['filterArea','filterCliente','filterParametro','filterEstado','filterPersona'].forEach(id=>{
-            const el=document.getElementById(id); if(el) el.addEventListener('change',aplicarFiltrosTabla);
-        });
-        const st=document.getElementById('searchTable'); if(st) st.addEventListener('input',aplicarFiltrosTabla);
+        const st=document.getElementById('searchTable');
+        if(st) { let _dbt; st.addEventListener('input', ()=>{ clearTimeout(_dbt); _dbt=setTimeout(aplicarFiltrosTabla, 150); }); }
         document.addEventListener('click', e=>{
             const cm=document.getElementById('colToggleMenu');
             if(cm && !cm.parentElement.contains(e.target)) cm.classList.remove('open');
@@ -1487,6 +1804,12 @@ function actualizarTablaPrincipal() {
             const pm=document.getElementById('personalDropdownMenu');
             const pw=document.getElementById('personalDropdownWrap');
             if(pm && pw && !pw.contains(e.target)) pm.classList.add('hidden');
+            // Cerrar panels multiselect si click fuera
+            MS_IDS.forEach(id => {
+                const wrap = document.getElementById('ms-' + id);
+                const panel = document.getElementById('ms-panel-' + id);
+                if (panel && wrap && !wrap.contains(e.target)) panel.classList.remove('open');
+            });
         });
         filtrosListenersAttached = true;
     }
@@ -1498,14 +1821,16 @@ function poblarFiltros() {
     const clientes =[...new Set(datosOriginales.map(d=>d.Cliente))].filter(Boolean).sort();
     const personas =[...new Set(datosOriginales.map(d=>d.Persona))].filter(Boolean).sort();
     const params   =[...new Set(datosOriginales.map(d=>d.Parametro))].filter(Boolean).sort();
-    const setOpts=(id,vals,prefix)=>{
-        const el=document.getElementById(id); if(!el) return;
-        el.innerHTML=`<option value="">${prefix}</option>`+vals.map(v=>`<option value="${v}">${String(v).substring(0,50)}</option>`).join('');
-    };
-    setOpts('filterArea',     areas,    'Todas las areas');
-    setOpts('filterCliente',  clientes, 'Todos los clientes');
-    setOpts('filterPersona',  personas, 'Todas las personas');
-    setOpts('filterParametro',params,   'Todos los parametros');
+    const matrices =[...new Set(datosOriginales.map(d=>d.Matriz))].filter(Boolean).sort();
+    msPoblar('filterArea',      areas);
+    msPoblar('filterCliente',   clientes);
+    msPoblar('filterPersona',   personas);
+    msPoblar('filterParametro', params);
+    msPoblar('filterMatriz',    matrices);
+    // Reset state when data reloads
+    MS_IDS.forEach(id => { msSel[id] = new Set(); msUpdateBtn(id); });
+    const allCbs = document.querySelectorAll('[id^="ms-all-"]');
+    allCbs.forEach(cb => { cb.checked = true; });
 }
 
 // ─── Alertas Table ───────────────────────────────────────────────────────────
@@ -1675,7 +2000,8 @@ function actualizarHeatmap() {
 
 // ─── Detail Modal ────────────────────────────────────────────────────────────
 function abrirModal(idx) {
-    const d = datosGlobales[idx];
+    // idx puede ser _gIdx (estable) o índice en datosGlobales según el llamador
+    const d = datosOriginales[idx] ?? datosGlobales[idx];
     if (!d) return;
     const progColor = d.pctPlazo > 100 ? '#ef4444' : d.pctPlazo > 75 ? '#f97316' : d.pctPlazo > 50 ? '#eab308' : '#22c55e';
     const progPct   = Math.min(d.pctPlazo, 100);
@@ -1756,33 +2082,65 @@ function mostrarToast(mensaje, tipo='info') {
     setTimeout(()=>{ toast.classList.remove('show'); toast.classList.add('hide'); setTimeout(()=>toast.remove(),300); },3500);
 }
 
-// ─── localStorage ────────────────────────────────────────────────────────────
-function guardarEnLocalStorage(rawData, fechaArchivo) {
-    try {
-        localStorage.setItem(LS_RAW, JSON.stringify(rawData));
-        localStorage.setItem(LS_META, JSON.stringify({fecha: fechaArchivo || new Date().toLocaleString('es-ES'), total: rawData.length}));
-    } catch(e) { console.warn('localStorage no disponible:', e); }
+// ─── Cache en IndexedDB (sustituye localStorage para datos grandes) ───────────
+function _cacheIDB() {
+    return new Promise((res, rej) => {
+        const req = indexedDB.open('labDashboardCache_v1', 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore('data');
+        req.onsuccess = e => res(e.target.result);
+        req.onerror   = e => rej(e.target.error);
+    });
 }
-function cargarDesdeLocalStorage() {
+async function _cacheSet(k, v) {
+    const db = await _cacheIDB();
+    return new Promise((res, rej) => { const tx=db.transaction('data','readwrite'); tx.objectStore('data').put(v,k); tx.oncomplete=res; tx.onerror=e=>rej(e.target.error); });
+}
+async function _cacheGet(k) {
+    const db = await _cacheIDB();
+    return new Promise((res, rej) => { const req=db.transaction('data','readonly').objectStore('data').get(k); req.onsuccess=e=>res(e.target.result??null); req.onerror=e=>rej(e.target.error); });
+}
+async function _cacheDel(...keys) {
+    const db = await _cacheIDB();
+    return new Promise(res => { const tx=db.transaction('data','readwrite'); keys.forEach(k=>tx.objectStore('data').delete(k)); tx.oncomplete=res; });
+}
+
+async function guardarEnLocalStorage(rawData, fechaArchivo) {
     try {
-        const raw=localStorage.getItem(LS_RAW); if(!raw) return false;
-        const meta=JSON.parse(localStorage.getItem(LS_META)||'{}');
-        const rawData=JSON.parse(raw);
-        datosOriginales=procesarDatos(rawData);
-        datosGlobales=[...datosOriginales];
+        // Meta en localStorage (pequeño), datos en IndexedDB (sin límite práctico)
+        localStorage.setItem(LS_META, JSON.stringify({fecha: fechaArchivo || new Date().toLocaleString('es-ES'), total: rawData.length}));
+        localStorage.removeItem(LS_RAW); // limpiar residuo antiguo si lo hubiera
+        await _cacheSet('raw', rawData);
+    } catch(e) { console.warn('Error guardando cache:', e); }
+}
+async function cargarDesdeLocalStorage() {
+    try {
+        // Intentar IDB primero, luego fallback a localStorage antiguo
+        let rawData = await _cacheGet('raw').catch(() => null);
+        if (!rawData) {
+            const ls = localStorage.getItem(LS_RAW);
+            if (!ls) return false;
+            rawData = JSON.parse(ls);
+        }
+        const meta = JSON.parse(localStorage.getItem(LS_META)||'{}');
+        datosOriginales = procesarDatos(rawData);
+        datosGlobales   = [...datosOriginales];
         document.getElementById('uploadSection').classList.add('hidden');
         document.getElementById('dashboardContent').classList.remove('hidden');
-        document.getElementById('lastUpdate').textContent=meta.fecha||'-';
+        document.getElementById('lastUpdate').textContent = meta.fecha || '-';
         document.getElementById('btnNuevoArchivo').classList.remove('hidden');
         poblarAreas(); poblarPuestosTrabajo();
         actualizarDashboard();
-        mostrarToast('Sesion restaurada — '+datosOriginales.length+' muestras','info');
+        mostrarToast('Sesion restaurada — ' + datosOriginales.length + ' muestras', 'info');
+        checkStaleBanner();
         return true;
     } catch(e) {
-        localStorage.removeItem(LS_RAW); localStorage.removeItem(LS_META); return false;
+        await _cacheDel('raw').catch(()=>{});
+        localStorage.removeItem(LS_RAW); localStorage.removeItem(LS_META);
+        return false;
     }
 }
 function limpiarDatos() {
+    _cacheDel('raw').catch(()=>{});
     localStorage.removeItem(LS_RAW); localStorage.removeItem(LS_META);
     datosGlobales=[]; datosOriginales=[];
     Object.values(charts).forEach(c=>{ try{c.destroy();}catch(_){} });
@@ -2000,15 +2358,50 @@ function calVerDia(key) {
     info.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
+let calChartModo = 'mes'; // 'mes' | 'historico'
+
+function setCalChartModo(modo) {
+    calChartModo = modo;
+    const btnM = document.getElementById('calChartBtnMes');
+    const btnH = document.getElementById('calChartBtnHist');
+    const activeStyle  = 'background:hsl(var(--primary));color:hsl(var(--primary-foreground))';
+    const inactiveStyle = 'background:transparent;color:hsl(var(--muted-foreground))';
+    if (btnM) btnM.style.cssText = modo === 'mes'      ? activeStyle : inactiveStyle;
+    if (btnH) btnH.style.cssText = modo === 'historico' ? activeStyle : inactiveStyle;
+    // Reconstruir recMap completo y re-renderizar
+    const recMap = {};
+    datosGlobales.forEach((d, idx) => {
+        const fr = parseFecha(d['F. Recepcion'] || d['F. Recepción']);
+        if (!fr) return;
+        const key = fr.getFullYear() + '-' + String(fr.getMonth()+1).padStart(2,'0') + '-' + String(fr.getDate()).padStart(2,'0');
+        if (!recMap[key]) recMap[key] = [];
+        recMap[key].push(idx);
+    });
+    renderCalGraficaSemana(recMap);
+}
+
 function renderCalGraficaSemana(recMap) {
     const dias = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
     const totals = [0,0,0,0,0,0,0];
+
+    const año = calFechaMes.getFullYear();
+    const mes = calFechaMes.getMonth() + 1;
+    const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
     Object.entries(recMap).forEach(([key, idxs]) => {
         const [a,m,d] = key.split('-').map(Number);
+        if (calChartModo === 'mes' && (a !== año || m !== mes)) return;
         let dow = new Date(a, m-1, d).getDay();
         dow = dow === 0 ? 6 : dow - 1;
         totals[dow] += _calCount(idxs);
     });
+
+    // Subtitle
+    const subtitle = document.getElementById('calChartSubtitle');
+    if (subtitle) subtitle.textContent = calChartModo === 'mes'
+        ? MESES[mes-1] + ' ' + año
+        : 'Total historico de todas las muestras cargadas';
+
     const label = calModo === 'muestras' ? 'Muestras recibidas' : 'Parámetros recibidos';
     if (charts['calendarioChart']) charts['calendarioChart'].destroy();
     const maxV = Math.max(...totals, 1);
@@ -2078,6 +2471,7 @@ function _procesarArrayBuffer(arrayBuffer, nombre, fechaMod) {
     poblarAreas(); poblarPuestosTrabajo();
     actualizarDashboard();
     mostrarToast(datosOriginales.length + ' muestras cargadas — ' + nombre, 'success');
+    document.getElementById('staleBanner').style.display = 'none'; // datos frescos, ocultar aviso
 }
 
 function _mostrarFsStatusOk(nombre, fechaMod) {
@@ -2202,15 +2596,238 @@ async function _intentarAutoCargar() {
     if (perm === 'granted') {
         await recargarDesdeRuta();
     } else {
-        // Permiso caducado: mostrar aviso pero sin pedir gesto aqui
+        // Permiso caducado: esperar el primer gesto del usuario (clic en cualquier parte)
+        // para pedir permiso silenciosamente y recargar sin que tenga que buscar ningún botón
         _mostrarFsStatusPendiente(handle.name || 'V3.xls');
+        _registrarGestoAutoRecarga(handle);
     }
+}
+
+function _registrarGestoAutoRecarga(handle) {
+    // Banner flotante sutil que indica al usuario lo que tiene que hacer
+    const banner = document.createElement('div');
+    banner.id = 'autoBanner';
+    banner.style.cssText = 'position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);z-index:9998;' +
+        'background:hsl(var(--primary));color:hsl(var(--primary-foreground));' +
+        'padding:10px 20px;border-radius:9999px;font-size:.8rem;font-weight:600;' +
+        'box-shadow:0 4px 20px rgba(0,0,0,.25);cursor:pointer;white-space:nowrap;' +
+        'animation:_bannerIn .3s ease;pointer-events:auto;';
+    banner.textContent = '⟳  Haz clic aquí (o en cualquier parte) para actualizar datos';
+    document.body.appendChild(banner);
+
+    // Inyectar keyframe si no existe
+    if (!document.getElementById('_bannerStyle')) {
+        const s = document.createElement('style');
+        s.id = '_bannerStyle';
+        s.textContent = '@keyframes _bannerIn{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}';
+        document.head.appendChild(s);
+    }
+
+    const handler = async (e) => {
+        document.removeEventListener('pointerdown', handler, true);
+        banner.remove();
+        const p = await handle.requestPermission({ mode: 'read' });
+        if (p === 'granted') {
+            await recargarDesdeRuta();
+        } else {
+            mostrarToast('Permiso denegado — los datos no se pudieron actualizar', 'warning');
+        }
+    };
+    // Escucha capture para interceptar cualquier clic antes que nadie
+    document.addEventListener('pointerdown', handler, true);
+}
+
+// ─── Spotlight "/" ───────────────────────────────────────────────────────────
+let _spotIdx = -1;
+
+document.addEventListener('keydown', e => {
+    // '/' abre el spotlight salvo que el foco esté en un input/textarea/select
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tag = document.activeElement?.tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+            e.preventDefault();
+            abrirSpotlight();
+        }
+    }
+    if (e.key === 'Escape') cerrarSpotlight();
+});
+
+function abrirSpotlight() {
+    if (!datosGlobales.length) return;
+    const ov = document.getElementById('spotlightOverlay');
+    ov.style.display = 'flex';
+    const inp = document.getElementById('spotlightInput');
+    inp.value = '';
+    _spotIdx = -1;
+    document.getElementById('spotlightResults').innerHTML = _spotRender(datosGlobales.slice(0, 40));
+    setTimeout(() => inp.focus(), 50);
+}
+
+function cerrarSpotlight() {
+    document.getElementById('spotlightOverlay').style.display = 'none';
+}
+
+function _spotRender(items) {
+    if (!items.length) return `<p style="padding:20px;text-align:center;font-size:.85rem;color:hsl(var(--muted-foreground))">Sin resultados</p>`;
+    return items.map((d, i) => `
+        <div class="spot-item" data-i="${i}" onclick="spotlightAbrir(${d._gIdx})"
+          style="padding:10px 16px;cursor:pointer;border-bottom:1px solid hsl(var(--border));display:flex;align-items:center;justify-content:space-between;gap:8px"
+          onmouseenter="spotlightHover(${i})">
+          <div style="min-width:0">
+            <p style="font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(d.Muestra||'-')} <span style="font-weight:400;color:hsl(var(--muted-foreground))">— ${escHtml((d.Parametro||'').substring(0,40))}</span></p>
+            <p style="font-size:.75rem;color:hsl(var(--muted-foreground));margin-top:2px">${escHtml((d.Cliente||'').substring(0,50))} · ${escHtml(d.Area||'-')}</p>
+          </div>
+          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold flex-shrink-0 ${estadoBadgeClass(d.estadoVencimiento)}">${estadoBadgeText(d.estadoVencimiento)}</span>
+        </div>`).join('');
+}
+
+function spotlightBuscar(q) {
+    _spotIdx = -1;
+    const ql = q.toLowerCase().trim();
+    const hits = !ql ? datosGlobales.slice(0,40)
+        : datosGlobales.filter(d =>
+            String(d.Muestra||'').toLowerCase().includes(ql) ||
+            String(d.Cliente||'').toLowerCase().includes(ql) ||
+            String(d.Parametro||'').toLowerCase().includes(ql) ||
+            String(d.Codigo||'').toLowerCase().includes(ql)
+        ).slice(0, 40);
+    document.getElementById('spotlightResults').innerHTML = _spotRender(hits);
+    _spotItems = hits;
+}
+
+let _spotItems = [];
+
+function spotlightNav(e) {
+    const items = document.querySelectorAll('.spot-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); _spotIdx = Math.min(_spotIdx+1, items.length-1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); _spotIdx = Math.max(_spotIdx-1, 0); }
+    else if (e.key === 'Enter') {
+        if (_spotIdx >= 0 && _spotItems[_spotIdx]) { spotlightAbrir(_spotItems[_spotIdx]._gIdx); }
+        return;
+    } else return;
+    items.forEach((el,i) => el.style.background = i===_spotIdx ? 'hsl(var(--muted))' : '');
+    items[_spotIdx]?.scrollIntoView({block:'nearest'});
+}
+
+function spotlightHover(i) { _spotIdx = i; }
+
+function spotlightAbrir(gIdx) {
+    cerrarSpotlight();
+    // Navegar a tablas si no estamos en una vista con modal
+    if (vistaActual !== 'tablas' && vistaActual !== 'alertas' && vistaActual !== 'miidia') cambiarVista('tablas');
+    setTimeout(() => abrirModal(gIdx), vistaActual !== 'tablas' ? 300 : 0);
+}
+
+// ─── Banner datos obsoletos ───────────────────────────────────────────────────
+function checkStaleBanner() {
+    try {
+        const meta = JSON.parse(localStorage.getItem('labDashboard_v3_meta') || '{}');
+        if (!meta.fecha) return;
+        const fechaMeta = new Date(meta.fecha);
+        if (isNaN(fechaMeta)) return;
+        const diffH = (Date.now() - fechaMeta.getTime()) / 3600000;
+        if (diffH > 24) document.getElementById('staleBanner').style.display = 'block';
+    } catch(_) {}
+}
+
+// ─── Comparativa Analistas ────────────────────────────────────────────────────
+let compModo = 'muestras';
+
+function setCompModo(modo) {
+    compModo = modo;
+    const activeStyle  = 'background:hsl(var(--primary));color:hsl(var(--primary-foreground))';
+    const inactiveStyle = 'background:transparent;color:hsl(var(--muted-foreground))';
+    document.getElementById('comp-btn-muestras').style.cssText  = modo==='muestras'   ? activeStyle : inactiveStyle;
+    document.getElementById('comp-btn-parametros').style.cssText = modo==='parametros' ? activeStyle : inactiveStyle;
+    actualizarComparativa();
+}
+
+function actualizarComparativa() {
+    const personas = [...new Set(datosOriginales.map(d => d.Persona).filter(Boolean))].sort();
+    if (!personas.length) {
+        document.getElementById('comp-grid').innerHTML = '<p style="color:hsl(var(--muted-foreground));font-size:.85rem">No hay datos de persona/analista en el archivo.</p>';
+        return;
+    }
+
+    const stats = personas.map(p => {
+        const rows = datosGlobales.filter(d => d.Persona === p);
+        const base = compModo === 'muestras' ? getMuestrasUnicas(rows) : rows;
+        return {
+            persona: p,
+            total:    base.length,
+            vencidas: base.filter(d => d.estadoVencimiento === 'vencido').length,
+            proximas: base.filter(d => d.estadoVencimiento === 'proximo').length,
+            enplazo:  base.filter(d => d.estadoVencimiento === 'ok').length,
+            sinFirma: base.filter(d => !d.firmado).length,
+            sinFin:   base.filter(d => !d.finAnaCompleto).length,
+        };
+    }).sort((a,b) => b.total - a.total);
+
+    const maxTotal = Math.max(...stats.map(s=>s.total), 1);
+
+    // Cards
+    document.getElementById('comp-grid').innerHTML = stats.map(s => {
+        const pct = Math.round((s.total / maxTotal) * 100);
+        const alertColor = s.vencidas > 0 ? 'hsl(var(--destructive))' : s.proximas > 0 ? 'hsl(24.6 95% 53.1%)' : 'hsl(142 76% 36%)';
+        return `<div class="rounded-lg border p-4 space-y-3" style="background:hsl(var(--background));border-color:hsl(var(--border))">
+            <div class="flex items-center gap-2">
+                <div class="rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold flex-shrink-0" style="background:hsl(var(--muted));color:hsl(var(--foreground))">${escHtml(s.persona.substring(0,2).toUpperCase())}</div>
+                <p class="text-sm font-semibold truncate" title="${escHtml(s.persona)}">${escHtml(s.persona)}</p>
+            </div>
+            <div class="text-2xl font-bold" style="color:${alertColor}">${s.total}</div>
+            <div style="height:4px;border-radius:2px;background:hsl(var(--muted))"><div style="height:100%;width:${pct}%;border-radius:2px;background:${alertColor};transition:width .4s"></div></div>
+            <div class="grid grid-cols-3 gap-1 text-center" style="font-size:.7rem">
+                <div><p style="color:hsl(var(--destructive));font-weight:700">${s.vencidas}</p><p style="color:hsl(var(--muted-foreground))">Venc.</p></div>
+                <div><p style="color:hsl(24.6 95% 53.1%);font-weight:700">${s.proximas}</p><p style="color:hsl(var(--muted-foreground))">Próx.</p></div>
+                <div><p style="color:hsl(142 76% 36%);font-weight:700">${s.enplazo}</p><p style="color:hsl(var(--muted-foreground))">OK</p></div>
+            </div>
+        </div>`;
+    }).join('');
+
+    // Tabla detalle
+    document.getElementById('comp-tabla-body').innerHTML = stats.map(s => {
+        const pct = Math.round((s.total / maxTotal) * 100);
+        return `<tr class="border-b hover:bg-muted/50 transition-colors" style="border-color:hsl(var(--border))">
+            <td class="px-4 py-3 text-sm font-medium">${escHtml(s.persona)}</td>
+            <td class="px-4 py-3 text-sm text-center font-bold">${s.total}</td>
+            <td class="px-4 py-3 text-sm text-center font-semibold" style="color:hsl(var(--destructive))">${s.vencidas||'-'}</td>
+            <td class="px-4 py-3 text-sm text-center font-semibold" style="color:hsl(24.6 95% 53.1%)">${s.proximas||'-'}</td>
+            <td class="px-4 py-3 text-sm text-center font-semibold" style="color:hsl(142 76% 36%)">${s.enplazo}</td>
+            <td class="px-4 py-3 text-sm text-center" style="color:hsl(var(--muted-foreground))">${s.sinFirma||'-'}</td>
+            <td class="px-4 py-3 text-sm text-center" style="color:hsl(var(--muted-foreground))">${s.sinFin||'-'}</td>
+            <td class="px-4 py-3"><div style="height:6px;border-radius:3px;background:hsl(var(--muted));width:120px"><div style="height:100%;width:${pct}%;border-radius:3px;background:hsl(var(--primary));transition:width .4s"></div></div></td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="8" class="px-4 py-6 text-center text-sm" style="color:hsl(var(--muted-foreground))">Sin datos</td></tr>';
+
+    // Gráfico de barras
+    if (charts['compChart']) charts['compChart'].destroy();
+    const ctx = document.getElementById('compChart');
+    if (!ctx) return;
+    charts['compChart'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: stats.map(s => s.persona),
+            datasets: [
+                { label:'En plazo',  data: stats.map(s=>s.enplazo),  backgroundColor:'hsl(142 76% 36%)', borderRadius:4 },
+                { label:'Próximas',  data: stats.map(s=>s.proximas), backgroundColor:'hsl(24.6 95% 53.1%)', borderRadius:4 },
+                { label:'Vencidas',  data: stats.map(s=>s.vencidas), backgroundColor:'hsl(var(--destructive))', borderRadius:4 },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position:'top', labels:{ boxWidth:12, font:{ size:11 } } } },
+            scales: { x:{ stacked:true }, y:{ stacked:true, beginAtZero:true, ticks:{ precision:0 } } }
+        }
+    });
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 initDarkMode();
-cargarDesdeLocalStorage();   // datos en cache mientras auto-carga termina
-_intentarAutoCargar();       // siempre recarga desde el archivo real
+(async () => {
+    await cargarDesdeLocalStorage();  // datos en cache mientras auto-carga termina
+    await _intentarAutoCargar();      // siempre recarga desde el archivo real
+})();
 
 </script>
 </body>
